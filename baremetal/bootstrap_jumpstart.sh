@@ -34,7 +34,16 @@ fi
 # - enp0s10: intnet_internal (Red Internal - IP estática 192.168.2.254)
 echo -e "${YELLOW}[*] Configurando interfaces de red (Netplan)...${NC}"
 
-cat <<EOF > /etc/netplan/50-cloud-init.yaml
+# 2.1 Desactivar la configuración de red automática de cloud-init para que no pise nuestro Netplan al reiniciar
+if [ -d /etc/cloud/cloud.cfg.d ]; then
+    echo -e "${YELLOW}[*] Desactivando configuración de red de cloud-init para persistencia...${NC}"
+    echo "network: {config: disabled}" > /etc/cloud/cloud.cfg.d/99-disable-network-config.cfg
+fi
+
+# Eliminar el archivo por defecto de cloud-init para evitar conflictos
+rm -f /etc/netplan/50-cloud-init.yaml
+
+cat <<EOF > /etc/netplan/99-manual-networks.yaml
 network:
     version: 2
     ethernets:
