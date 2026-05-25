@@ -255,6 +255,108 @@ def run_vbox_cmd(cmd, cwd=None):
         return False
     return True
 
+
+def finalize_node(name, nodes, tftp_pxe_dir=None, templates_dir=None):
+    """
+    Finaliza el aprovisionamiento de un nodo tras su instalación:
+      1. Sobreescribe su fichero PXE (por MAC) con LOCALBOOT 0 para que en el
+         siguiente arranque PXE el jumpstart lo redirija al disco local.
+      2. Ejecuta el playbook Ansible correspondiente al tipo de nodo.
+
+    Esta función se invoca desde provision_callback.py (servidor HTTP del jumpstart)
+    cuando el nodo llama a /node-ready al terminar su autoinstall.
+    """
+    # Localizar el nodo en la lista
+    node = next((n for n in nodes if n.get('name') == name), None)
+    if not node:
+        print(f"[-] finalize_node: nodo '{name}' no encontrado en los YAMLs.")
+        return False
+
+    mac = node.get('mac')
+    if not mac:
+        print(f"[-] finalize_node: el nodo '{name}' no tiene MAC definida.")
+        return False
+
+    node_type = node.get('type', 'generic')
+    node_networks = node.get('networks', [])
+    node_ip = node_networks[0].get('ip') if node_networks else None
+
+    # Determinar directorio TFTP
+    if tftp_pxe_dir is None:
+        is_live = os.path.exists('/srv/tftp')
+        if is_live:
+            tftp_pxe_dir = '/srv/tftp/pxelinux.cfg'
+        else:
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            tftp_pxe_dir = os.path.join(script_dir, 'baremetal', 'pxe', 'pxelinux.cfg')
+
+    os.makedirs(tftp_pxe_dir, exist_ok=True)
+
+    # 1. Escribir LOCALBOOT en el fichero PXE de esta MAC
+    mac_formatted = '01-' + mac.lower().replace(':', '-')
+    pxe_file_path = os.path.join(tftp_pxe_dir, mac_formatted)
+    localboot_content = f"""# Nodo '{name}' — instalación completada. Arranca desde disco local.
+DEFAULT local
+LABEL local
+  LOCALBOOT 0
+"""
+    with open(pxe_file_path, 'w') as f:
+        f.write(localboot_content)
+    print(f"[+] finalize_node: PXE de '{name}' ({mac_formatted}) actualizado a LOCALBOOT 0.")
+    print(f"    El nodo arrancará desde disco en el próximo boot PXE.")
+
+    # 2. Ejecutar playbook Ansible
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    if templates_dir is None:
+        playbooks_dir = os.path.join(script_dir, 'playbooks')
+    else:
+        playbooks_dir = os.path.join(os.path.dirname(templates_dir), '..', 'playbooks')
+        playbooks_dir = os.path.normpath(playbooks_dir)
+
+    playbook_path = os.path.join(playbooks_dir, f'{node_type}.yml')
+    if not os.path.exists(playbook_path):
+        # Fallback: playbook genérico
+        playbook_path = os.path.join(playbooks_dir, 'generic.yml')
+
+    if node_ip and os.path.exists(playbook_path):
+        # --- NUEVO: Esperar a que el nodo esté arriba (reinicio completado) ---
+        import socket, time
+        print(f"[*] finalize_node: esperando a que el nodo '{name}' (IP: {node_ip}) responda por SSH...")
+        max_wait = 600  # 10 minutos máximo de espera
+        elapsed = 0
+        ready = False
+        while elapsed < max_wait:
+            try:
+                with socket.create_connection((node_ip, 22), timeout=3):
+                    ready = True
+                    break
+            except (socket.timeout, ConnectionRefusedError, OSError):
+                pass
+            time.sleep(5)
+            elapsed += 5
+            
+        if not ready:
+            print(f"[!] finalize_node: timeout esperando a SSH en '{name}'. Saltando Ansible.")
+            return False
+            
+        print(f"[+] finalize_node: SSH de '{name}' detectado. Ejecutando playbook Ansible '{playbook_path}'...")
+        result = subprocess.run(
+            ['ansible-playbook', playbook_path, '-i', f'{node_ip},', '--ssh-extra-args', '-o StrictHostKeyChecking=no'],
+            text=True
+        )
+        if result.returncode == 0:
+            print(f"[+] finalize_node: playbook completado con éxito para '{name}'.")
+        else:
+            print(f"[!] finalize_node: el playbook terminó con errores (código {result.returncode}). Revisa la salida de Ansible.")
+    elif not os.path.exists(playbook_path):
+        print(f"[!] finalize_node: no se encontró playbook en '{playbook_path}'. Saltando Ansible.")
+        print(f"    Crea 'playbooks/{node_type}.yml' o 'playbooks/generic.yml' para automatizar la configuración post-instalación.")
+    else:
+        print(f"[!] finalize_node: no se pudo determinar la IP de '{name}'. Saltando Ansible.")
+
+    return True
+
+
 def deploy_virtualbox_vms(nodes, vm_dir="/home/Chadry/VirtualBox VMs"):
     """Crea las máquinas virtuales en VirtualBox a partir de las especificaciones YAML (limpiando previas)."""
     print("[*] Iniciando despliegue (deploy) de la maqueta en VirtualBox...")
@@ -421,6 +523,9 @@ def deploy_virtualbox_vms(nodes, vm_dir="/home/Chadry/VirtualBox VMs"):
         print(f"[*] Encendiendo VM '{name}' en segundo plano (headless)...")
         vm_folder = os.path.join(vm_dir, name)
         run_vbox_cmd(["VBoxManage", "startvm", name, "--type", "headless"], cwd=vm_folder)
+        print(f"[*] La VM '{name}' está arrancando. El jumpstart gestionará automáticamente")
+        print(f"    el cambio a arranque desde disco al finalizar la instalación.")
+
 
 def undeploy_virtualbox_vms(nodes):
     """Elimina por completo todas las VMs creadas (excepto jumpstart) y limpia sus archivos asociados."""
@@ -450,6 +555,7 @@ def undeploy_virtualbox_vms(nodes):
         else:
             print(f"[*] La VM '{name}' no existe en VirtualBox. Saltando.")
     print("[*] Desinstalación completada.")
+
 
 # ----------------- GENERADOR CONFIGURACIONES PXE (EN JUMPSTART) -----------------
 
@@ -668,6 +774,7 @@ LABEL ubuntu-22.04
         user_data_content = ud_template.replace("{{ HOSTNAME }}", name)
         user_data_content = user_data_content.replace("{{ SSH_PUB_KEY }}", ssh_key)
         user_data_content = user_data_content.replace("{{ INTERFACES_CONFIG }}", netplan_interface_config)
+        user_data_content = user_data_content.replace("{{ JUMPSTART_IP }}", jumpstart_ip)
         
         user_data_dst = os.path.join(node_install_dir, "user-data")
         with open(user_data_dst, 'w') as f:
@@ -692,8 +799,9 @@ def main():
     default_templates_dir = os.path.join(script_dir, "baremetal", "templates")
 
     parser = argparse.ArgumentParser(description="Orquestador Dinámico PXE/VirtualBox para GAR")
-    parser.add_argument('--action', required=True, choices=['validate', 'deploy', 'undeploy', 'generate-configs'],
-                        help="Acción a realizar: validar YAMLs, desplegar VMs, desinstalar VMs o generar configs PXE.")
+    parser.add_argument('--action', required=True,
+                        choices=['validate', 'deploy', 'undeploy', 'generate-configs', 'finalize-node'],
+                        help="Acción a realizar: validar YAMLs, desplegar VMs, desinstalar VMs, generar configs PXE, o finalizar aprovisionamiento de un nodo.")
     parser.add_argument('--nodes-dir', default=default_nodes_dir, help=f"Directorio con archivos YAML de nodos (por defecto {default_nodes_dir})")
     parser.add_argument('--templates-dir', default=default_templates_dir, help=f"Directorio con plantillas Autoinstall (por defecto {default_templates_dir})")
     parser.add_argument('--vm-dir', default="/home/Chadry/VirtualBox VMs", help="Ruta base para los discos virtuales en el host")
@@ -748,21 +856,18 @@ def main():
             print("[-] Error de validación en los YAML. Abortando generación de configs.")
             sys.exit(1)
             
-        # Opcionalmente filtrar generación PXE/Autoinstall si se especificó --node, pero manteniendo DHCP completo
-        generate_nodes = nodes
-        if args.node:
-            generate_nodes = [n for n in nodes if n.get('name') == args.node]
-            if not generate_nodes:
-                print(f"[-] Error: El nodo '{args.node}' no está definido en los archivos YAML del directorio '{args.nodes_dir}'.")
-                sys.exit(1)
-                
-        # Pasamos generate_nodes a generate_pxe_configs. Para DHCP siempre usará todos los nodes leídos de nodes_dir (que es robusto)
-        # pero para el PXE/Autoinstall podemos optimizar si se desea. Sin embargo, para mantenerlo simple y coherente,
-        # pasamos nodes para DHCP completo, y opcionalmente filtramos.
-        # En la implementación de generate_pxe_configs, el bucle itera sobre nodes. Vamos a pasar ambos o simplemente la lista completa.
-        # De hecho, generate_pxe_configs(nodes, templates_dir) usa la lista completa para DHCP y PXE/Autoinstalls.
-        # Vamos a dejar generate-configs con la lista completa 'nodes' para garantizar la consistencia de todos los servicios DHCP/PXE.
         generate_pxe_configs(nodes, args.templates_dir)
+
+    elif args.action == 'finalize-node':
+        # Invocado por el servidor de callback del jumpstart al recibir /node-ready
+        if not args.node:
+            print("[-] Error: --action finalize-node requiere --node <nombre>.")
+            sys.exit(1)
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        is_live = os.path.exists('/srv/tftp')
+        tftp_pxe_dir = '/srv/tftp/pxelinux.cfg' if is_live else os.path.join(script_dir, 'baremetal', 'pxe', 'pxelinux.cfg')
+        success = finalize_node(args.node, nodes, tftp_pxe_dir=tftp_pxe_dir, templates_dir=args.templates_dir)
+        sys.exit(0 if success else 1)
 
 if __name__ == '__main__':
     main()

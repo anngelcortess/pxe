@@ -174,12 +174,27 @@ systemctl enable isc-dhcp-server
 systemctl restart apache2
 systemctl enable apache2
 
+echo -e "${YELLOW}[*] Instalando servicio de callback de aprovisionamiento (provision-callback)...${NC}"
+
+# Determinar ruta del repositorio (un nivel arriba del directorio baremetal)
+REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+
+# Actualizar la ruta del ExecStart en el .service según la ubicación real del repo
+CALLBACK_SERVICE_SRC="${REPO_DIR}/baremetal/provision-callback.service"
+sed "s|/root/trabajo|${REPO_DIR}|g" "$CALLBACK_SERVICE_SRC" > /etc/systemd/system/provision-callback.service
+
+systemctl daemon-reload
+systemctl enable --now provision-callback
+echo -e "${GREEN}[+] Servicio provision-callback activo en el puerto 8081.${NC}"
+echo -e "    Diagnóstico: curl http://localhost:8081/health"
+
 echo -e "${GREEN}====================================================${NC}"
 echo -e "${GREEN}===  BOOTSTRAP DEL JUMPSTART COMPLETADO CON ÉXITO ===${NC}"
 echo -e "${GREEN}====================================================${NC}"
 echo -e "${BLUE}El servidor PXE está listo y esperando clientes en:${NC}"
 echo -e "- Red Main: ${GREEN}192.168.1.254${NC} (enp0s9)"
 echo -e "- Red Internal: ${GREEN}192.168.2.254${NC} (enp0s10)"
+echo -e "- Callback anti-loop PXE: ${GREEN}:8081/node-ready${NC}"
 echo -e "- Clave SSH pública registrada en Autoinstall."
 echo -e "${BLUE}Próximo paso: Arrancar tus máquinas clientes en modo red PXE.${NC}"
 echo -e "${GREEN}====================================================${NC}"
