@@ -1,6 +1,7 @@
 name: jumpstart
 type: jumpstart
 mac: "08:00:27:00:00:01"
+host_only_ip: "192.168.56.10"  # IP estática del adaptador Host-Only (enp0s8), fuera del rango DHCP VirtualBox (.101-.254)
 networks:
   - name: NAT
     type: NAT
@@ -12,5 +13,5 @@ networks:
     netmask: "255.255.255.0"
 vbox_specs:
   cpus: 2
-  ram_mb: 6144
+  ram_mb: 7168
   disk_gb: 30

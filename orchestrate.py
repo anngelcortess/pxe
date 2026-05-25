@@ -276,14 +276,51 @@ def deploy_virtualbox_vms(nodes, vm_dir="/home/Chadry/VirtualBox VMs"):
             running_vms.append(match.group(1))
             
     # 2. Control inteligente y encendido automático de Jumpstart
+    # Buscar el nodo jumpstart en la lista para leer su host_only_ip
+    jumpstart_node = next((n for n in nodes if n.get('name') == 'jumpstart'), {})
+    jumpstart_host_ip = jumpstart_node.get('host_only_ip', '').strip()
+
     if "jumpstart" not in running_vms:
         if "jumpstart" in existing_vms:
             print("[!] El servidor de aprovisionamiento 'jumpstart' está apagado.")
             print("[*] Encendiendo 'jumpstart' automáticamente en segundo plano (headless)...")
             subprocess.run(["VBoxManage", "startvm", "jumpstart", "--type", "headless"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            import time
-            time.sleep(3) # Pausa de cortesía para el arranque
-            print("[+] 'jumpstart' encendido con éxito en segundo plano.")
+            import time, socket
+
+            if jumpstart_host_ip:
+                # --- Sondeo activo: esperar hasta que Apache (puerto 80) responda ---
+                max_wait = 120  # Timeout máximo en segundos
+                poll_interval = 2
+                elapsed = 0
+                print(f"[*] Sondeo activo: esperando a que los servicios PXE del 'jumpstart' ({jumpstart_host_ip}) respondan...")
+                print(f"    (Timeout máximo: {max_wait} segundos)")
+                ready = False
+                while elapsed < max_wait:
+                    sys.stdout.write(f"\r    [ {elapsed}s ] Comprobando puerto 80 (Apache) en {jumpstart_host_ip}...")
+                    sys.stdout.flush()
+                    try:
+                        with socket.create_connection((jumpstart_host_ip, 80), timeout=2):
+                            ready = True
+                            break
+                    except (socket.timeout, ConnectionRefusedError, OSError):
+                        pass
+                    time.sleep(poll_interval)
+                    elapsed += poll_interval
+
+                if ready:
+                    print(f"\r    [+] ¡Servicios PXE del 'jumpstart' detectados y activos! ({elapsed}s)      ")
+                else:
+                    print(f"\r    [!] Timeout: el jumpstart no respondió en {max_wait}s. Continuando igualmente...")
+            else:
+                # --- Fallback: espera fija si no hay IP Host-Only configurada ---
+                wait_time = 25
+                print(f"[*] Esperando {wait_time} segundos (espera fija). Para activar la espera inteligente,")
+                print(f"    añade la IP Host-Only del jumpstart al campo 'host_only_ip' en baremetal/nodes/jumpstart.yml")
+                for i in range(wait_time, 0, -1):
+                    sys.stdout.write(f"\r    [ {i} segundos restantes... ] ")
+                    sys.stdout.flush()
+                    time.sleep(1)
+                print("\r    [+] 'jumpstart' encendido. Continuando el despliegue...              \n")
         else:
             print("\n[-] ERROR DE CONFIGURACIÓN BÁSICA:")
             print("    La máquina virtual 'jumpstart' no está creada ni registrada en VirtualBox.")
@@ -291,6 +328,8 @@ def deploy_virtualbox_vms(nodes, vm_dir="/home/Chadry/VirtualBox VMs"):
             print("    Por favor, crea la VM 'jumpstart' manualmente en VirtualBox (con sus 3 adaptadores de red) antes de desplegar.")
             print("    Abortando despliegue.\n")
             sys.exit(1)
+    else:
+        print("[+] El servidor 'jumpstart' ya está en ejecución. Procediendo directamente al despliegue.")
 
     for node in nodes:
         name = node.get('name')

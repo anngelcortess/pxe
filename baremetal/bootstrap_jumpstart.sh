@@ -27,10 +27,11 @@ if [ "$EUID" -ne 0 ]; then
 fi
 
 # 2. Identificar las interfaces de red de la máquina
-# Por defecto en VirtualBox con 3 interfaces:
-# - enp0s3: NAT (Salida a Internet)
-# - enp0s8: intnet_main (Red Main - 192.168.1.254)
-# - enp0s9: intnet_internal (Red Internal - 192.168.2.254)
+# Adaptadores VirtualBox del Jumpstart (4 interfaces):
+# - enp0s3:  NAT         (Salida a Internet - DHCP automático)
+# - enp0s8:  Host-Only   (Acceso SSH desde el Host - IP estática 192.168.56.10, fuera del rango DHCP .101-.254)
+# - enp0s9:  intnet_main (Red Main - IP estática 192.168.1.254)
+# - enp0s10: intnet_internal (Red Internal - IP estática 192.168.2.254)
 echo -e "${YELLOW}[*] Configurando interfaces de red (Netplan)...${NC}"
 
 cat <<EOF > /etc/netplan/50-cloud-init.yaml
@@ -40,7 +41,9 @@ network:
         enp0s3:
             dhcp4: true
         enp0s8:
-            dhcp4: true
+            dhcp4: false
+            addresses:
+                - 192.168.56.10/24
         enp0s9:
             dhcp4: false
             addresses:
