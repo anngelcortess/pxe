@@ -572,7 +572,7 @@ LABEL ubuntu-22.04
   KERNEL images/ubuntu-22.04/vmlinuz
   INITRD images/ubuntu-22.04/initrd
   IPAPPEND 2
-  APPEND ip=dhcp url=http://{jumpstart_ip}/ubuntu-22.04/ubuntu-22.04.5-live-server-amd64.iso autoinstall ds=nocloud-net;s=http://{jumpstart_ip}/autoinstall/{name}/
+  APPEND initrd=images/ubuntu-22.04/initrd ip=dhcp url=http://{jumpstart_ip}/ubuntu-22.04/ubuntu-22.04.5-live-server-amd64.iso autoinstall ds=nocloud-net;s=http://{jumpstart_ip}/autoinstall/{name}/
 """
         with open(pxe_file_path, 'w') as f:
             f.write(pxe_menu_content)
