@@ -9,5 +9,5 @@ networks:
     dns: ["8.8.8.8", "8.8.4.4"]
 vbox_specs:
   cpus: 1
-  ram_mb: 2048
+  ram_mb: 4096
   disk_gb: 20
