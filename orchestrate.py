@@ -563,8 +563,8 @@ subnet {subnet} netmask {netmask} {{
         
         pxe_menu_content = f"""DEFAULT menu.c32
 PROMPT 0
-TIMEOUT 0
-ONTIMEOUT 0
+TIMEOUT 10
+ONTIMEOUT ubuntu-22.04
 MENU TITLE PXE Boot Menu
 
 LABEL ubuntu-22.04
