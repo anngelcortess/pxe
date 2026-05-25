@@ -1,0 +1,104 @@
+Gestión y Administración de Redes:
+
+Despliegue y administración de un CMS
+Revisión 2
+
+1. Introducción
+El presente documento presenta el proyecto práctico a realizar por cada grupo de alumnos. La labor
+principal de la práctica consistirá en la integración de una serie de tecnologías para crear una
+solución final que cumpla con los requisitos que a continuación se indicarán.
+La ejecución final del proyecto se realizará en un entorno controlado del laboratorio, aunque
+aquellos grupos que lo consideren pueden proponer entornos alternativos que deben ser validados
+por el profesor antes de comenzar con la resolución de la práctica.
+El trabajo consistirá en crear un diseño e implementación de una infraestructura IT para una
+empresa ficticia. Es requisito indispensable que dicha infraestructura lógica se aprovisione de
+manera automática. Los productos utilizados para realizar la implementación serán propuestos por
+el profesor y el grupo seleccionará libremente aquellos que deseen utilizar. No obstante, si un grupo
+decide utilizar una tecnología que no esté propuesta por el profesor, ésta deberá ser validada antes
+de comenzar a utilizarla.
+
+2. El problema
+La empresa Fake Enterprise dispone de un pequeño centro de datos donde quiere instalar un
+servicio CMS. Dado el carácter sensible de los datos que se almacenarán en el CMS la seguridad debe
+ser un aspecto clave en el diseño de la solución.
+Los encargados de IT de la empresa establecen una serie de requisitos que se enumeran a
+continuación:
+1. La red debe dividirse en dos subredes: internal y main.
+2. La red internal contará con seis nodos fijos que ejecutarán un clúster de alta disponibilidad
+con 2 nodos maestros y 2 workers.
+3. Se instanciará una base de datos tipo SQL dentro del clúster
+4. La red main contará con tres nodos fijos que ejecutarán los siguientes servicios:
+a. Balanceador de carga
+b. Dos servidores HTTP/S que serán frontales del CMS
+5. Además, la empresa dispone de 8 puestos hot-desk de los empleados conectados a la red
+main.
+6. Desde internet, solamente se podrá acceder a los servicios expuestos por el balanceador de
+carga. Se debe intentar cerrar cualquier otro tipo de acceso desde fuera de la red.
+7. Desde la red main se debe poder acceder a internet y a internal.
+8. Desde la red internal sólo se podrá acceder a direcciones de la red main.
+
+9. Cada nodo debe estar convenientemente securizado de manera que sólo exponga los
+servicios en él instalados y los necesarios para su monitorización y administración.
+10. Todos los nodos se monitorizarán para obtener lecturas de uso de CPU, memoria, disco y
+red. El nodo que monitorizará todo el sistema se encontrará en internal.
+11. Los servicios también se monitorizarán con las tecnologías disponibles para ellos
+(extensiones SNMP de apache, por ejemplo) de manera que se deben recoger todas las
+métricas posibles de todos los servicios desplegados.
+12. El diseño deberá contar con redundancia donde sea posible, de manera que el deterioro de
+un cable no “tumbe” la infraestructura entera.
+13. El aprovisionamiento de los nodos debe ser completamente automático. Para ello se
+dispone de un nodo (nodo jumpstart o bootstrapping) que puede utilizarse para estas
+funciones. Se entiende por aprovisionamiento:
+a. La instalación de la plataforma del nodo.
+b. La instalación del servicio que presta el nodo.
+c. La configuración del servicio.
+d. Instalación y configuración del agente de monitorización (cuando sea necesario)
+14. El nodo de aprovisionamiento estará conectado a ambos segmentos de red, pero una vez
+desplegado el sistema completo, este nodo debe poder apagarse sin que eso suponga un
+problema para el sistema.
+15. Para probar la infraestructura, debe ser posible generar un TrafficMix desde fuera de la red y
+desde un puesto hot-desk que genere cierta actividad en la base de datos.
+16. Si es necesario escribir algún script o programa para facilitar la integración, el lenguaje es
+libre, aunque se recomiendan Bash/shell y Python.
+
+3. La solución
+La solución consistirá en: el diseño de red en GNS3 (o en otro sistema elegido por el equipo). Dicho
+diseño incluirá la configuración mínima necesaria en routers y switches (si fuera necesario) que
+demuestren la conectividad entre DTEs de las distintas áreas identificadas, es decir: red externa,
+internal y main.
+Además del diseño de red, se elaborará una lista de todos los componentes software (y sus
+versiones) que formarán parte de la solución: todo el software que se va a utilizar, incluyendo sus
+dependencias y versión de release. En la lista de software, no se debe olvidar el firmware de los
+dispositivos empleados (switches, routers, DTEs, etc.) ni los sistemas operativos elegidos.
+Finalmente, se deben incluir todas las configuraciones, scripts y demás assets necesarios para
+desplegar la solución en la red del laboratorio. El despliegue debe ser lo más automático posible,
+permitiéndose intervención manual para encender y apagar las VMs y en la configuración del nodo
+jumpstart.
+La solución deberá contar con una documentación que indique lo siguiente:
+•
+•
+•
+
+Datos de entrada necesarios para configurar el despliegue (prefijos de red, direcciones MAC,
+etc.)
+Diagrama de conexiones/rutas de los nodos
+Manual de administración que incluya:
+ Pasos necesarios para llevar a cabo un despliegue
+ Cómo examinar la monitorización de los elementos del despliegue
+ Pasos necesarios para ampliar los puestos hot-desk
+
+•
+
+ Pasos necesarios para sustituir/aumentar frontales web
+ Pasos necesarios para sustituir/aumentar los nodos de la base de datos
+Software Baseline completo (lista de todo el software utilizado, incluyendo versiones y URLs
+de origen)
+
+4. La entrega
+El día de la entrega deberá existir un tag en el repositorio del proyecto que incluya todos los ficheros
+preparados para el proyecto. Se deberán evitar, en la medida de lo posible, imágenes ISO y archivos
+binarios, sustituyendo por scripts que descarguen o generen dichos ficheros.
+Después de la fecha de entrega, se asignará a cada equipo una sesión para que demuestre el
+funcionamiento de su solución en vivo.
+
+

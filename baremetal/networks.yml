@@ -1,0 +1,17 @@
+networks:
+  - name: intnet_main
+    subnet: "192.168.1.0"
+    netmask: "255.255.255.0"
+    gateway: "192.168.1.254"
+    dns: ["8.8.8.8", "8.8.4.4"]
+    dhcp_range:
+      start: "192.168.1.150"
+      end: "192.168.1.200"
+  - name: intnet_internal
+    subnet: "192.168.2.0"
+    netmask: "255.255.255.0"
+    gateway: "192.168.2.254"
+    dns: ["8.8.8.8", "8.8.4.4"]
+    dhcp_range:
+      start: "192.168.2.150"
+      end: "192.168.2.200"

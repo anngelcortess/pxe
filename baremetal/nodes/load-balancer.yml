@@ -1,0 +1,13 @@
+name: load-balancer
+type: load-balancer
+mac: "08:00:27:00:01:0A"
+networks:
+  - name: intnet_main
+    ip: "192.168.1.10"
+    netmask: "255.255.255.0"
+    gateway: "192.168.1.254"
+    dns: ["8.8.8.8", "8.8.4.4"]
+vbox_specs:
+  cpus: 1
+  ram_mb: 512
+  disk_gb: 15

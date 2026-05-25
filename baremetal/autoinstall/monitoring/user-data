@@ -1,0 +1,37 @@
+#cloud-config
+autoinstall:
+  version: 1
+  locale: es_ES.UTF-8
+  keyboard:
+    layout: es
+  refresh-installer:
+    update: false
+  identity:
+    hostname: monitoring
+    username: admin
+    password: "$6$CylgQV.8wYk/VUlE$UpXhP0y5NrH3ZypUfNvOF2/JEu5rRedFbseqWxsJ/dN0.XjeiK9ho.e78NWOysq/4o19qn1MolUcccrIyCjj5."
+    realname: Administrator
+  ssh:
+    install-server: true
+    authorized-keys:
+      - "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC2r... admin@jumpstart"
+    allow-pw: true
+  network:
+    version: 2
+    ethernets:
+      enp0s3:
+        dhcp4: false
+        addresses:
+          - 192.168.2.30/24
+        gateway4: 192.168.2.254
+        nameservers:
+          addresses:
+            - 8.8.8.8
+            - 8.8.4.4
+  storage:
+    layout:
+      name: direct
+  updates: security
+  late-commands:
+    - "curtin in-target systemctl disable apt-daily.timer apt-daily-upgrade.timer"
+    - "curtin in-target systemctl disable unattended-upgrades.service"

@@ -1,189 +1,85 @@
-# PXE Boot + Instalación Desatendida
+# 🚀 Orquestador de Infraestructura Baremetal Dinámica y Desatendida (GAR - P1)
 
-## Descripción
+Este repositorio contiene la fase de **aprovisionamiento baremetal e infraestructura virtual** para el Proyecto Práctico de la asignatura **Gestión y Administración de Redes (GAR)**. 
 
-Demo de despliegue automático de nodos mediante PXE (Preboot Execution Environment) e instalación desatendida de Ubuntu Server 22.04.
-
-Se usan DHCP, TFTP y HTTP para asignar IPs, distribuir archivos de arranque y perfiles de instalación.
+Hemos diseñado e implementado una solución **100% orientada a datos (YAML-driven)** en Python 3 y Bash que automatiza por completo la creación de las redes de VirtualBox, el despliegue de las máquinas virtuales cliente en segundo plano y el bootstrap de un servidor **Jumpstart** (PXE, DHCP, TFTP, HTTP) capaz de instalar Ubuntu Server 22.04 LTS de forma totalmente desatendida (`Autoinstall` / `cloud-init`).
 
 ---
 
-## Entorno de la demo
+## 📂 Directorio del Proyecto
 
-- **1 VM servidor PXE**: Ubuntu Server 22.04 (instalación limpia)
-- **2 VMs cliente**
+La estructura actual de la raíz del proyecto es limpia y modular, habiendo eliminado cualquier residuo obsoleto del prototipo inicial:
 
-### Topología de la red
-```
-             +------------------+
-             |  Servidor PXE    |
-             |  192.168.1.1     |
-             |  enp0s9          |
-             +--------+---------+
-                      |
-       Red interna PXE: 192.168.1.0/24
-                      |
-       +--------------+--------------+
-       |                             |
-+------+------------+            +---+----------------+
-| Cliente PXE 1     |            | Cliente PXE 2      |
-| 192.168.1.50      |            | 192.168.1.51       |
-| 12:34:56:78:90:ab |            | 12:34:56:78:90:ba  |
-| enp0s3            |            | enp0s3             |
-+-------------------+            +--------------------+
+```text
+trabajo/
+├── GAR_P1.pdf                     # Enunciado oficial del proyecto
+├── README.md                      # Este portal de inicio
+├── .gitignore                     # Escudo de exclusión (logs de VirtualBox, ISOs, VDIs)
+├── orchestrate.py                 # Orquestador dinámico en Python 3 (renombrado y movido)
+│
+├── docs/                          # 📘 Documentación detallada del sistema
+│   ├── plan.md                    # Plan de diseño arquitectónico y YAMLs
+│   ├── walkthrough.md             # Guía paso a paso, despliegue y defensa ante el profesor
+│   └── task.md                    # Checklist y control de calidad de tareas completadas
+│
+└── baremetal/                     # 🛠️ Código fuente de aprovisionamiento
+    ├── bootstrap_jumpstart.sh     # Script automatizado de bootstrap del servidor Jumpstart
+    ├── networks.yml               # Parametrización dinámica de subredes
+    ├── nodes/                     # Directorio con los 18 archivos YAML de definición de nodos
+    ├── templates/                 # Plantillas de autoinstalación (user-data y meta-data)
+    ├── dhcp/                      # Directorio de salida DHCP (pruebas locales)
+    ├── pxe/                       # Directorio de salida menús PXELINUX (pruebas locales)
+    └── autoinstall/               # Directorio de salida perfiles interpolados (pruebas locales)
 ```
 
 ---
-## Estructura del repositorio
-```
-PXE-TFTP/
-├── autoinstall
-│   ├── nodo_1
-│   │   ├── meta-data
-│   │   └── user-data       # Perfil Autoinstall nodo 1
-│   └── nodo_2
-│       ├── meta-data
-│       └── user-data       # Perfil Autoinstall nodo 2
-├── dhcp
-│   └── dhcpd.conf           # Configuración del servidor DHCP
-└── pxe
-    └── pxelinux.cfg
-        ├── 01-12-34-56-78-90-ab   # Menú PXE nodo 1
-        └── 01-12-34-56-78-90-ba   # Menú PXE nodo 2
-```
-----
-## Guía de instalacion paso a paso
-> La guía se realiza como `root`, por lo que los comandos no incluyen `sudo`.
-> 
-### 1. Instalación de dependencias
 
-```bash
-apt update
+## 🛠️ Características Principales
 
-apt install -y tftpd-hpa isc-dhcp-server apache2 syslinux pxelinux syslinux-common
-```
+1. **Modelado Dinámico YAML-driven**:
+   * Las subredes (`networks.yml`) y cada nodo de la maqueta (`nodes/*.yml`) se definen de forma desacoplada. Añadir, modificar o eliminar nodos o subredes escala la infraestructura de manera automática sin tocar una sola línea de código.
+2. **Orquestador Modular en Python (`orchestrate.py`)**:
+   * Implementa un cargador YAML inteligente con parser de *fallback* nativo (para poder ejecutarse en entornos mínimos sin dependencias como `PyYAML`).
+   * Soporta validación estricta de IPs y MACs (`--action validate`) para evitar conflictos de red.
+   * Maneja el ciclo de vida de VirtualBox (`deploy`/`undeploy`) recreando discos VDI y redes de forma limpia.
+   * Inicia las VMs en segundo plano (`headless`) y redirige los archivos de log de VirtualBox (`VirtualBoxVM-<pid>.log`) al directorio correspondiente de cada máquina, manteniendo la raíz del proyecto libre de ruido.
+3. **Bootstrap Automatizado del Jumpstart (`bootstrap_jumpstart.sh`)**:
+   * Un único script de Bash a ejecutar en el servidor que automatiza el direccionamiento estático en Netplan, instala las dependencias (`isc-dhcp-server`, `tftpd-hpa`, `apache2`), descarga la ISO oficial de Ubuntu, extrae los kernels de red y arranca la orquestación.
 
+---
 
-### 2. Configuración de red (Netplan)
-Configurar la interfaz de la red interna (`/etc/netplan/50-cloud-init.yaml`)
-```
-network:
-    ethernets:
-        enp0s3:
-            dhcp4: true
-        enp0s8:
-            dhcp4: true
-        enp0s9:
-          dhcp4: false
-          addresses:
-            - 192.168.1.1/24
-    version: 2
-```
-Aplicar configuración 
-```bash
-netplan apply
-```
+## 📖 Documentación de Referencia (Quick Links)
 
+Para profundizar en la implementación y preparar la defensa del proyecto, consulta la documentación oficial en la carpeta `docs/`:
 
-### 3. Configuración TFTP
-> Servirá los archivos de arranque (PXELINUX, kernel e initrd) a los clientes que hagan PXE Boot.
+* 📋 **[Plan de Implementación](file:///home/Chadry/esi/gyar/trabajo/docs/plan.md)**: Conoce el formato detallado de definición de nodos, la parametrización de subredes y el comportamiento interno del orquestador en cada fase.
+* 🚀 **[Guía de Walkthrough y Defensa](file:///home/Chadry/esi/gyar/trabajo/docs/walkthrough.md)**: Guía paso a paso para desplegar la maqueta en el Host anfitrión, inicializar el Jumpstart y la **estrategia para realizar con éxito la defensa en vivo ante el profesor** instalando una máquina vacía de prueba.
+* ✅ **[Roadmap y Checklist de Tareas](file:///home/Chadry/esi/gyar/trabajo/docs/task.md)**: El listado completo de hitos de desarrollo implementados y verificados.
 
-Crear estructura de directorios y permisos
-```bash
-mkdir -p /srv/tftp/pxelinux.cfg /srv/tftp/images
-chown -R tftp:tftp /srv/tftp
-chmod -R 755 /srv/tftp
-```
-Copiar archivos de PXE
-```bash
-cp /usr/lib/PXELINUX/pxelinux.0 /srv/tftp/
-cp /usr/lib/syslinux/modules/bios/*.c32 /srv/tftp/
-```
-Configurar servidor TFTP (`/etc/default/tftpd-hpa`)
-```
-TFTP_USERNAME="tftp"
-TFTP_DIRECTORY="/srv/tftp"
-TFTP_ADDRESS=":69"
-TFTP_OPTIONS="--secure"
-```
-Reiniciar y habilitar servicio:
-```
-systemctl restart tftpd-hpa
-systemctl enable tftpd-hpa
-```
+---
 
-### 4. Configuracion DHCP
-> Cada cliente recibe IP automáticamente según su MAC.
+## ⚡ Comandos Rápidos de Uso
 
-Copiar la [configuración del servidor DHCP](./dhcp/dhcpd.conf) incluida:
-```bash
-cp dhcp/dhcpd.conf /etc/dhcp/dhcpd.conf
-```
+### En el Host Anfitrión (Con VirtualBox)
 
-Especificar interfaz DHCP(`/etc/default/isc-dhcp-server`)
-```
-INTERFACESv4="enp0s9"
-```
+1. **Validar consistencia de los YAML de nodos y redes**:
+   ```bash
+   python3 orchestrate.py --action validate
+   ```
 
-Reiniciar y habilitar servicio:
-```
-systemctl restart isc-dhcp-server
-systemctl enable isc-dhcp-server
-```
-> Cada nodo recibirá IP del servidor DHCP a través de enp0s9.
+2. **Desplegar y arrancar la maqueta cliente en VirtualBox (Headless)**:
+   ```bash
+   python3 orchestrate.py --action deploy
+   ```
 
-### 5. Preparar archivos de instalación
-Crear directorios necesarios:
-```bash
-mkdir -p /srv/tftp/images/ubuntu-22.04
-mkdir -p /var/www/html/ubuntu-22.04
-```
+3. **Eliminar y limpiar de raíz las VMs clientes de VirtualBox**:
+   ```bash
+   python3 orchestrate.py --action undeploy
+   ```
 
-Descargar ISO en el directorio del servidor HTTP:
-```bash
-wget https://releases.ubuntu.com/22.04/ubuntu-22.04.5-live-server-amd64.iso
-mv ubuntu-22.04.5-live-server-amd64.iso /var/www/html/ubuntu-22.04
-```
+### En el Servidor Jumpstart (Máquina de Aprovisionamiento)
 
-Montar ISO
-```bash
-mkdir /mnt/ubuntu-iso
-mount -o loop /var/www/html/ubuntu-22.04/ubuntu-22.04*.iso /mnt/ubuntu-iso
-```
-
-Copiar kernel e initrd al directorio del servidor TFTP
-```bash
-cp /mnt/ubuntu-iso/casper/{vmlinuz,initrd} /srv/tftp/images/ubuntu-22.04/
-```
-
-Desmontar ISO
-```bash
-umount /mnt/ubuntu-iso
-```
-
-### 6. Configuración PXE
-Copiar [configuración del menú PXE](./pxe/pxelinux.cfg)
-
-```bash
-cp -r pxe/pxelinux.cfg /srv/tftp/
-```
-- [Nodo 1](./pxe/pxelinux.cfg/01-12-34-56-78-90-ab)
-- [Nodo 2](./pxe/pxelinux.cfg/01-12-34-56-78-90-ba)
-> Cada nodo usa su menú PXE específico según su MAC, que apunta a su perfil de autoinstall.
-
-
-### 7. Perfiles autoinstall
-
-Copiar [perfiles](./autoinstall) al servidor HTTP
-```bash
-cp -r autoinstall/ /var/www/html/
-```
-- [Perfil nodo 1](./autoinstall/nodo_1/user-data)
-- [Perfil nodo 2](./autoinstall/nodo_2/user-data)
-> Cada cliente descargará automaticamente su perfil según su MAC.
-
-### 8. Arrancar clientes
-- Configurar arranque por red (PXE) en cada VM cliente.
-- El cliente recibirá IP, cargará PXELINUX, seleccionará su perfil y realizará la instalación automáticamente.
-
-
+1. **Configurar todos los servicios PXE/DHCP/HTTP en caliente**:
+   ```bash
+   sudo ./baremetal/bootstrap_jumpstart.sh
+   ```

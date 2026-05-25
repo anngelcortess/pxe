@@ -1,0 +1,12 @@
+DEFAULT menu.c32
+PROMPT 0
+TIMEOUT 0
+ONTIMEOUT 0
+MENU TITLE PXE Boot Menu
+
+LABEL ubuntu-22.04
+  MENU LABEL Install Ubuntu 22.04 Server (storage-node)
+  KERNEL images/ubuntu-22.04/vmlinuz
+  INITRD images/ubuntu-22.04/initrd
+  IPAPPEND 2
+  APPEND ip=dhcp url=http://192.168.2.254/ubuntu-22.04/ubuntu-22.04.5-live-server-amd64.iso autoinstall ds=nocloud-net;s=http://192.168.2.254/autoinstall/storage-node/

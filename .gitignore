@@ -1,0 +1,38 @@
+# ==============================================================================
+# Gitignore para Práctica de Gestión y Administración de Redes (GAR)
+# ==============================================================================
+
+# VirtualBox e Infraestructura
+*.log
+*.vdi
+*.vbox
+*.vbox-prev
+*.iso
+*.img
+tmp/
+temp/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.venv/
+venv/
+ENV/
+env/
+
+# Editores e IDEs
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+*~
+
+# Sistema Operativo
+.DS_Store
+Thumbs.db
+EOF

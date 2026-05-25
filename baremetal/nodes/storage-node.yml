@@ -1,0 +1,13 @@
+name: storage-node
+type: storage
+mac: "08:00:27:00:02:0E"
+networks:
+  - name: intnet_internal
+    ip: "192.168.2.14"
+    netmask: "255.255.255.0"
+    gateway: "192.168.2.254"
+    dns: ["8.8.8.8", "8.8.4.4"]
+vbox_specs:
+  cpus: 1
+  ram_mb: 512
+  disk_gb: 30

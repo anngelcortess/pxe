@@ -1,0 +1,13 @@
+name: cluster-master-1
+type: cluster-node
+mac: "08:00:27:00:02:0A"
+networks:
+  - name: intnet_internal
+    ip: "192.168.2.10"
+    netmask: "255.255.255.0"
+    gateway: "192.168.2.254"
+    dns: ["8.8.8.8", "8.8.4.4"]
+vbox_specs:
+  cpus: 2
+  ram_mb: 1024
+  disk_gb: 20
