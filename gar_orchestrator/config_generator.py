@@ -117,14 +117,6 @@ def _generate_pxe_menu(name, mac, jumpstart_ip, tftp_pxe_dir):
 def _generate_autoinstall_files(node, jumpstart_ip, ssh_key, templates_dir, web_autoinstall_dir):
     """Genera los archivos meta-data y user-data inyectando variables en las plantillas."""
     name = node.get('name')
-    node_type = node.get('type')
-    primary_net = node.get('networks', [])[0]
-    
-    ip_addr = primary_net.get('ip')
-    netmask = primary_net.get('netmask', '255.255.255.0')
-    gateway = primary_net.get('gateway', '')
-    dns_servers = primary_net.get('dns', [])
-    cidr = "24" if netmask == '255.255.255.0' else "16"
     
     node_install_dir = os.path.join(web_autoinstall_dir, name)
     os.makedirs(node_install_dir, exist_ok=True)
@@ -148,18 +140,38 @@ def _generate_autoinstall_files(node, jumpstart_ip, ssh_key, templates_dir, web_
     else:
         ud_template = "#cloud-config\nautoinstall:\n  version: 1\n"
         
-    dns_str = "\n".join([f"            - {d}" for d in dns_servers]) if dns_servers else ""
+    # Mapeo de NICs de VirtualBox a nombres de interfaz Linux
+    # --nic1 → enp0s3, --nic2 → enp0s8, --nic3 → enp0s9, --nic4 → enp0s10
+    VBOX_NIC_NAMES = ["enp0s3", "enp0s8", "enp0s9", "enp0s10"]
     
-    netplan_interface_config = f"""      enp0s3:
-        dhcp4: false
-        addresses:
-          - {ip_addr}/{cidr}"""
-    
-    if gateway:
-        netplan_interface_config += f"\n        gateway4: {gateway}"
+    netplan_interface_config = ""
+    for idx, net in enumerate(node.get('networks', [])):
+        if idx >= len(VBOX_NIC_NAMES):
+            break
+        nic_name = VBOX_NIC_NAMES[idx]
+        net_type = net.get('type', 'intnet').lower()
         
-    if dns_str:
-        netplan_interface_config += f"""\n        nameservers:\n          addresses:\n{dns_str}"""
+        if net_type == 'nat':
+            # Interfaz NAT de VirtualBox: usa DHCP (VBox asigna IP automáticamente)
+            netplan_interface_config += f"      {nic_name}:\n        dhcp4: true"
+        else:
+            # Interfaz de red interna: configuración estática
+            ip = net.get('ip', '')
+            nm = net.get('netmask', '255.255.255.0')
+            gw = net.get('gateway', '')
+            dns_list = net.get('dns', [])
+            cidr = "24" if nm == '255.255.255.0' else "16"
+            
+            netplan_interface_config += f"      {nic_name}:\n        dhcp4: false\n        addresses:\n          - {ip}/{cidr}"
+            if gw:
+                netplan_interface_config += f"\n        gateway4: {gw}"
+            if dns_list:
+                dns_entries = "\n".join([f"            - {d}" for d in dns_list])
+                netplan_interface_config += f"\n        nameservers:\n          addresses:\n{dns_entries}"
+        
+        # Separador entre interfaces
+        if idx < len(node.get('networks', [])) - 1:
+            netplan_interface_config += "\n"
 
     user_data_content = ud_template.replace("{{ HOSTNAME }}", name)
     user_data_content = user_data_content.replace("{{ SSH_PUB_KEY }}", ssh_key)

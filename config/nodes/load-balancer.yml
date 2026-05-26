@@ -5,8 +5,11 @@ networks:
   - name: intnet_main
     ip: "192.168.1.10"
     netmask: "255.255.255.0"
-    gateway: "192.168.1.254"
+    # Sin gateway aquí: la ruta por defecto del LB sale por la interfaz NAT (enp0s8).
+    # Esto permite que el LB haga NAT para toda la red main.
     dns: ["8.8.8.8", "8.8.4.4"]
+  - name: NAT
+    type: nat
 vbox_specs:
   cpus: 1
   ram_mb: 7168

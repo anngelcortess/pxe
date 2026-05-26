@@ -67,6 +67,36 @@ echo -e "${GREEN}[+] Archivo Netplan generado. Aplicando configuración...${NC}"
 netplan apply
 sleep 2
 
+# 2.2 Habilitar NAT para que los nodos aprovisionados tengan acceso a Internet
+# El Jumpstart actúa como router NAT durante el aprovisionamiento. Los nodos usan
+# al Jumpstart como gateway (192.168.1.254 / 192.168.2.254) y el Jumpstart reenvía
+# el tráfico hacia Internet a través de su interfaz NAT de VirtualBox (enp0s3).
+echo -e "${YELLOW}[*] Habilitando IP forwarding y NAT (MASQUERADE)...${NC}"
+
+# Activar reenvío de paquetes IP (inmediato + persistente)
+sysctl -w net.ipv4.ip_forward=1
+if ! grep -q "^net.ipv4.ip_forward=1" /etc/sysctl.conf 2>/dev/null; then
+    echo "net.ipv4.ip_forward=1" >> /etc/sysctl.conf
+fi
+
+# Reglas iptables: enmascarar todo lo que salga por enp0s3 (NAT de VirtualBox)
+iptables -t nat -C POSTROUTING -o enp0s3 -j MASQUERADE 2>/dev/null || \
+    iptables -t nat -A POSTROUTING -o enp0s3 -j MASQUERADE
+
+# Permitir forwarding desde las redes internas hacia Internet
+iptables -C FORWARD -i enp0s9 -o enp0s3 -j ACCEPT 2>/dev/null || \
+    iptables -A FORWARD -i enp0s9 -o enp0s3 -j ACCEPT   # main → internet
+iptables -C FORWARD -i enp0s10 -o enp0s3 -j ACCEPT 2>/dev/null || \
+    iptables -A FORWARD -i enp0s10 -o enp0s3 -j ACCEPT  # internal → internet (solo durante provisioning)
+iptables -C FORWARD -m state --state ESTABLISHED,RELATED -j ACCEPT 2>/dev/null || \
+    iptables -A FORWARD -m state --state ESTABLISHED,RELATED -j ACCEPT
+
+# Persistir reglas iptables para que sobrevivan a reinicios
+DEBIAN_FRONTEND=noninteractive apt-get install -y iptables-persistent > /dev/null 2>&1 || true
+netfilter-persistent save > /dev/null 2>&1 || true
+
+echo -e "${GREEN}[+] NAT habilitado. Los nodos pueden acceder a Internet a través del Jumpstart.${NC}"
+
 # 3. Instalación de dependencias del sistema
 echo -e "${YELLOW}[*] Actualizando repositorios e instalando paquetes necesarios...${NC}"
 apt-get update
