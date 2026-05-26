@@ -53,11 +53,9 @@ Si usas el parámetro `type: nat` (como en el ejemplo de arriba), el orquestador
 
 ---
 
-## 3. Plantillas Cloud-Init (`templates/user-data-*`)
+## 3. Plantilla Cloud-Init (`templates/user-data`)
 
-La clave `type` del fichero YAML determina qué plantilla de autoinstalación (`user-data`) se utilizará para ese nodo específico. Por ejemplo, si indicas `type: load-balancer`, el orquestador buscará el archivo `templates/user-data-load-balancer`.
-
-Estas plantillas están pre-cargadas con marcadores especiales que el orquestador sustituye "en caliente" (interpolación) justo antes de entregárselas a las máquinas durante la instalación.
+Esta plantilla está pre-cargada con marcadores especiales que el orquestador sustituye "en caliente" (interpolación) justo antes de entregárselas a las máquinas durante la instalación.
 
 ### Variables Interpolables:
 * `{{ HOSTNAME }}`: Sustituido por el nombre del nodo.
