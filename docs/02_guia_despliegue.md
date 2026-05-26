@@ -23,26 +23,9 @@ Para que nuestra orquestación funcione, el script de Python que corre en el Jum
 
 ---
 
-## FASE 2: Despliegue de la Maqueta Baremetal
+## FASE 2: Inicialización del Servidor Jumpstart
 
-Con el Host preparado, podemos ordenar la creación de todas las máquinas virtuales definidas en `config/nodes/`.
-
-1. En el terminal de tu Host, ejecuta:
-   ```bash
-   ./provisioner.py deploy
-   ```
-
-**¿Qué hace este comando?**
-* **Validación**: Comprueba que no has escrito IPs duplicadas ni MACs mal formateadas.
-* **Seguridad Anticolisiones**: Si detecta que ya existen VMs de un despliegue anterior, te avisará y te pedirá confirmación (`y/N`) antes de eliminarlas (para no destruir trabajo sin querer).
-* **Creación**: Habla con la Host API y le ordena ejecutar los `VBoxManage createvm`, creando los discos duros virtuales y configurando las tarjetas de red.
-* **Encendido Silencioso**: Enciende las máquinas en modo **Headless** (sin ventana gráfica). Todas las máquinas arrancarán e intentarán hacer boot por red (PXE), quedándose a la espera.
-
----
-
-## FASE 3: Inicialización del Servidor Jumpstart
-
-El Jumpstart es el corazón de nuestra red. Es la única máquina que habremos creado "a mano" previamente o que usaremos de forma persistente.
+El Jumpstart es el corazón de nuestra red. Es la única máquina que habremos creado "a mano" previamente clonando de una Ubuntu Server 22.04 base (del primer lab). 
 
 1. Arranca tu VM Jumpstart desde la interfaz de VirtualBox.
 2. Sube la carpeta de este proyecto a la VM (usando `git clone`, carpetas compartidas de VBox o `scp`).
@@ -58,8 +41,30 @@ El Jumpstart es el corazón de nuestra red. Es la única máquina que habremos c
 * Extrae el kernel instalador de Ubuntu.
 * Levanta el microservicio `provision-callback.service` en el puerto 8081.
 
+## FASE 3: Despliegue de la Maqueta Baremetal
+
+Con el Host y el Jumpstart preparados, podemos ordenar la creación de todas las máquinas virtuales definidas en `config/nodes/`.
+
+1. En el terminal del Jumpstart, ejecuta:
+   ```bash
+   ./provisioner.py deploy
+   ```
+o para evitar desplegar 17 nodos a la vez:
+   ```bash
+   ./provisioner.py deploy <nodo, ej: load-balancer> 
+   ```
+
+**¿Qué hace este comando?**
+* **Validación**: Comprueba que no has escrito IPs duplicadas ni MACs mal formateadas.
+* **Seguridad Anticolisiones**: Si detecta que ya existen VMs de un despliegue anterior, te avisará y te pedirá confirmación (`y/N`) antes de eliminarlas (para no destruir trabajo sin querer).
+* **Creación**: Habla con la Host API y le ordena ejecutar los `VBoxManage createvm`, creando los discos duros virtuales y configurando las tarjetas de red.
+* **Encendido Silencioso**: Enciende las máquinas en modo **Headless** (sin ventana gráfica). Todas las máquinas arrancarán e intentarán hacer boot por red (PXE), quedándose a la espera.
+
+---
+
+
 ### FASE 4: La Instalación Mágica
-Con el Jumpstart levantado, las VMs que se habían quedado esperando en PXE en la FASE 2 comenzarán a comunicarse con él.
+Con el Jumpstart levantado, las VMs que se habían quedado esperando en PXE en la FASE 3 comenzarán a comunicarse con él.
 1. Recibirán su IP mediante DHCP.
 2. Descargarán y ejecutarán el instalador desatendido de Ubuntu (Subiquity).
 3. Se instalarán solas, avisarán al puerto 8081 al terminar y se apagarán solas.
