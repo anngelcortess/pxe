@@ -2,11 +2,57 @@
 import os
 import sys
 import argparse
+import urllib.request
 
 from gar_orchestrator.parsers import load_all_nodes
 from gar_orchestrator.validators import validate_nodes
-from gar_orchestrator.vbox_client import deploy_virtualbox_vms, undeploy_virtualbox_vms, finalize_node, start_virtualbox_vms, stop_virtualbox_vms
+from gar_orchestrator.vbox_client import deploy_virtualbox_vms, undeploy_virtualbox_vms, finalize_node, start_virtualbox_vms, stop_virtualbox_vms, get_existing_vms
 from gar_orchestrator.config_generator import generate_pxe_configs
+
+# ── Preflight checks ──────────────────────────────────────────────────────────
+
+def _check_service(url, timeout=5):
+    """Comprueba que un servicio HTTP responde en /health."""
+    try:
+        with urllib.request.urlopen(url, timeout=timeout) as r:
+            return r.status == 200
+    except Exception:
+        return False
+
+def preflight_checks(host_api_url, need_vbox=False, need_callback=False):
+    """Verifica que los servicios necesarios estén activos antes de proceder."""
+    errors = []
+
+    if need_vbox:
+        vbox_url = f"{host_api_url}/health"
+        if not _check_service(vbox_url):
+            errors.append(
+                f"  ✗ vbox-api (Host)\n"
+                f"    No responde en: {vbox_url}\n"
+                f"    → Arranca el servicio en el Host: ./host_service.sh start"
+            )
+        else:
+            print("[✓] vbox-api (Host) — OK")
+
+    if need_callback:
+        cb_url = "http://localhost:8081/health"
+        if not _check_service(cb_url):
+            errors.append(
+                f"  ✗ provision-callback (Jumpstart)\n"
+                f"    No responde en: {cb_url}\n"
+                f"    → Arranca el servicio: systemctl start provision-callback"
+            )
+        else:
+            print("[✓] provision-callback (Jumpstart) — OK")
+
+    if errors:
+        print("\n[-] Preflight check fallido. Servicios no disponibles:\n")
+        for e in errors:
+            print(e)
+        print()
+        sys.exit(1)
+
+# ── Main ──────────────────────────────────────────────────────────────────────
 
 def main():
     script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -68,6 +114,25 @@ def main():
         if not validate_nodes(nodes):
             print("[-] Error de validación en los YAML. Abortando despliegue de VMs.")
             sys.exit(1)
+        preflight_checks(host_api_url, need_vbox=True, need_callback=True)
+            
+        # Comprobar si ya hay VMs desplegadas de la maqueta
+        target_names = [n.get('name') for n in nodes if n.get('name') != 'jumpstart' and n.get('mac')]
+        existing = get_existing_vms(host_api_url)
+        conflicting = [name for name in target_names if name in existing]
+        
+        if conflicting:
+            print(f"\n[!] Ya existen VMs de un despliegue anterior: {', '.join(conflicting)}")
+            print("    Continuar las ELIMINARÁ y creará de nuevo desde cero.")
+            confirm = input("\n    ¿Deseas continuar? (s/N): ").strip().lower()
+            if confirm not in ('s', 'si', 'sí', 'y', 'yes'):
+                print("[-] Despliegue cancelado por el usuario.")
+                sys.exit(0)
+            print()
+
+        # Generar configs PXE/DHCP/Autoinstall antes de desplegar (las VMs arrancan por PXE)
+        print("[*] Generando configuraciones de red antes del despliegue...")
+        generate_pxe_configs(nodes, args.templates_dir)
             
         deploy_nodes = nodes
         if args.node:
@@ -81,6 +146,7 @@ def main():
         if not validate_nodes(nodes):
             print("[-] Error de validación en los YAML. Abortando desinstalación.")
             sys.exit(1)
+        preflight_checks(host_api_url, need_vbox=True)
             
         undeploy_nodes = nodes
         if args.node:
@@ -98,6 +164,7 @@ def main():
         generate_pxe_configs(nodes, args.templates_dir)
 
     elif args.action == 'start':
+        preflight_checks(host_api_url, need_vbox=True)
         start_nodes = nodes
         if args.node:
             start_nodes = [n for n in nodes if n.get('name') == args.node]
@@ -107,6 +174,7 @@ def main():
         start_virtualbox_vms(start_nodes, host_api_url, args.type)
 
     elif args.action == 'stop':
+        preflight_checks(host_api_url, need_vbox=True)
         stop_nodes = nodes
         if args.node:
             stop_nodes = [n for n in nodes if n.get('name') == args.node]
@@ -119,6 +187,7 @@ def main():
         if not args.node:
             print("[-] Error: la acción finalize-node requiere un nodo explícito.")
             sys.exit(1)
+        preflight_checks(host_api_url, need_vbox=True)
         script_dir = os.path.dirname(os.path.abspath(__file__))
         is_live = os.path.exists('/srv/tftp')
         tftp_pxe_dir = '/srv/tftp/pxelinux.cfg' if is_live else os.path.join(script_dir, '.local_output', 'pxe', 'pxelinux.cfg')

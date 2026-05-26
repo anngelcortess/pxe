@@ -27,7 +27,9 @@ trabajo/
 │   ├── bootstrap_jumpstart.sh     # Inicialización del Jumpstart
 │   └── provision_callback.py      # Servidor HTTP de callback
 ├── services/                      # ⚙️ Archivos de configuración de systemd
-│   └── provision-callback.service
+│   ├── provision-callback.service
+│   └── vbox-api.service
+├── host_service.sh                # 🛠️ Script de gestión fácil para el Host
 ├── gar_orchestrator/              # 📦 Código fuente del orquestador
 ├── provisioner.py                 # 🚀 CLI principal de aprovisionamiento
 ├── vbox_api_server.py             # 🔌 Servidor API para VirtualBox
@@ -65,7 +67,21 @@ Para profundizar en la implementación y preparar la defensa del proyecto, consu
 
 ### En el Host Anfitrión (Con VirtualBox)
 
-1. **Validar consistencia de los YAML de nodos y redes**:
+1. **Gestionar el Servidor API de VirtualBox**:
+   Para que el Jumpstart pueda controlar las VMs en tu Host físico, el servidor API debe estar activo. Puedes gestionarlo fácilmente como un servicio de systemd de usuario con nuestro script:
+   ```bash
+   # Instalar y activar el servicio en segundo plano (solo la primera vez)
+   ./host_service.sh install
+
+   # Ver el estado del servicio o reiniciarlo
+   ./host_service.sh status
+   ./host_service.sh restart
+
+   # Ver los logs en tiempo real (Ctrl+C para salir)
+   ./host_service.sh logs
+   ```
+
+2. **Validar consistencia de los YAML de nodos y redes**:
    ```bash
    ./provisioner.py validate
    ```

@@ -202,10 +202,11 @@ echo -e "${YELLOW}║  ACCIÓN REQUERIDA EN EL HOST (solo una vez por equipo)   
 echo -e "${YELLOW}╚══════════════════════════════════════════════════════════╝${NC}"
 echo -e "${BLUE}El Jumpstart necesita comunicarse con el Host para cambiar el${NC}"
 echo -e "${BLUE}boot order de las VMs. Para ello, arranca el VBox API Server${NC}"
-echo -e "${BLUE}en tu ordenador anfitrión:${NC}"
+echo -e "${BLUE}en tu ordenador anfitrión usando nuestro script de control:${NC}"
 echo ""
 echo -e "${GREEN}  cd /ruta/al/repositorio${NC}"
-echo -e "${GREEN}  python3 vbox_api_server.py${NC}"
+echo -e "${GREEN}  ./host_service.sh install    # Para instalar y activar el servicio en segundo plano${NC}"
+echo -e "${GREEN}  ./host_service.sh logs       # Para ver los logs en tiempo real${NC}"
 echo ""
 
 echo -e "${BLUE}Verifica desde el Jumpstart que el servidor responde:${NC}"

@@ -7,6 +7,24 @@ import subprocess
 import urllib.request
 import urllib.error
 
+def _make_get_request(api_url, path):
+    """Realiza una petición GET genérica a la API de VirtualBox."""
+    if not api_url:
+        return None
+    endpoint = f"{api_url}{path}"
+    try:
+        with urllib.request.urlopen(endpoint, timeout=10) as response:
+            return json.loads(response.read().decode('utf-8'))
+    except Exception:
+        return None
+
+def get_existing_vms(host_api_url):
+    """Obtiene la lista de VMs registradas en VirtualBox a través de la API."""
+    result = _make_get_request(host_api_url, "/vbox/vms")
+    if result and result.get("status") == "ok":
+        return result.get("vms", [])
+    return []
+
 def _make_api_request(api_url, path, payload_dict):
     """Realiza una petición POST genérica a la API de VirtualBox."""
     if not api_url:
