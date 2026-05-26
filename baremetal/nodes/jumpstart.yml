@@ -2,6 +2,12 @@ name: jumpstart
 type: jumpstart
 mac: "08:00:27:00:00:01"
 host_only_ip: "192.168.56.10"  # IP estática del adaptador Host-Only (enp0s8), fuera del rango DHCP VirtualBox (.101-.254)
+
+# Conexión al servidor VBox API que corre en el Host
+# Para adaptar a otro equipo: solo cambia el puerto si lo modificaste al instalar el servicio.
+# La IP 192.168.56.1 es siempre la del Host en la red Host-Only de VirtualBox (no cambia).
+host_api_url: "http://192.168.56.1:7070"   # ← Cambiar puerto si usas otro distinto
+
 networks:
   - name: NAT
     type: NAT

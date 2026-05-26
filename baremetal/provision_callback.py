@@ -24,7 +24,7 @@ import logging
 from datetime import datetime
 
 # ── Configuración ──────────────────────────────────────────────────────────────
-PORT = 8081
+PORT = int(os.environ.get('PROVISION_PORT', 8081))
 # Ruta al orquestador Python (orchestrate.py), relativa a este script
 ORCHESTRATE_SCRIPT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'orchestrate.py')
 ORCHESTRATE_SCRIPT = os.path.normpath(ORCHESTRATE_SCRIPT)
@@ -89,12 +89,12 @@ class CallbackHandler(http.server.BaseHTTPRequestHandler):
         self.wfile.write(body_bytes)
 
     def _run_finalize(self, node_name):
-        """Invocar orchestrate.py --action finalize-node --node <nombre>."""
+        """Invocar orchestrate.py finalize-node <nombre>."""
         if not os.path.exists(ORCHESTRATE_SCRIPT):
             log.error(f"No se encontró orchestrate.py en: {ORCHESTRATE_SCRIPT}")
             return
 
-        cmd = [sys.executable, ORCHESTRATE_SCRIPT, '--action', 'finalize-node', '--node', node_name]
+        cmd = [sys.executable, ORCHESTRATE_SCRIPT, 'finalize-node', node_name]
         log.info(f"Ejecutando: {' '.join(cmd)}")
         try:
             result = subprocess.run(

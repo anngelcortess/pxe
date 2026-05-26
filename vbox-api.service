@@ -1,0 +1,21 @@
+[Unit]
+Description=GAR — VBox API Server (REST API para VBoxManage)
+Documentation=https://github.com/adriandpr84/pxe
+After=network.target
+
+[Service]
+Type=simple
+# IMPORTANTE: se ejecuta como el usuario del Host para tener acceso a VirtualBox.
+# VBoxManage necesita el entorno del usuario (no root) para encontrar las VMs.
+# La ruta al script se actualiza automáticamente al instalar con el comando del README.
+ExecStart=/usr/bin/python3 REPO_PATH/vbox_api_server.py --bind 0.0.0.0 --port 7070
+
+Restart=on-failure
+RestartSec=5s
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=vbox-api
+
+[Install]
+WantedBy=default.target
