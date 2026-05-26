@@ -36,7 +36,7 @@ Hemos implementado una infraestructura dinámicamente parametrizada que se estru
    * [common-meta-data](file:///home/Chadry/esi/gyar/trabajo/baremetal/templates/common-meta-data)
 
 4. **Orquestador Principal (`orchestrate.py`)**:
-   * [orchestrate.py](file:///home/Chadry/esi/gyar/trabajo/orchestrate.py): Un script unificado en Python 3 en la raíz del proyecto que implementa cuatro comandos principales (`--action validate`, `deploy`, `undeploy`, `generate-configs`). Cuenta con un parser YAML fallback nativo para poder correr sin dependencias de terceros (`PyYAML`) en cualquier sistema.
+   * [orchestrate.py](file:///home/Chadry/esi/gyar/trabajo/orchestrate.py): Un script unificado en Python 3 en la raíz del proyecto que implementa comandos posicionales (`validate`, `deploy`, `undeploy`, `generate-configs`). Cuenta con un parser YAML fallback nativo para poder correr sin dependencias de terceros (`PyYAML`) en cualquier sistema.
 
 5. **Script de Bootstrap del Jumpstart (`baremetal/bootstrap_jumpstart.sh`)**:
    * [bootstrap_jumpstart.sh](file:///home/Chadry/esi/gyar/trabajo/baremetal/bootstrap_jumpstart.sh): Script de Bash robusto diseñado para ejecutarse una vez dentro del servidor Jumpstart (`root`/`sudo`). Instala todos los servicios, configura Netplan, descarga la ISO oficial de Ubuntu 22.04 LTS, extrae el kernel/initrd al TFTP y ejecuta el orquestador en caliente.
@@ -50,10 +50,10 @@ Para desplegar la maqueta desde cero y realizar la defensa en vivo de forma flui
 ### Paso 1: Crear las Máquinas Virtuales en el Host (Anfitrión)
 Desde la consola de tu equipo anfitrión (donde corre VirtualBox), sitúate en el directorio del proyecto y ejecuta el orquestador para realizar el despliegue limpio de las VMs:
 ```bash
-python3 orchestrate.py --action deploy
+./orchestrate.py deploy
 ```
 > [!IMPORTANT]
-> **¿Qué hace la acción `--action deploy`?**
+> **¿Qué hace la acción `deploy`?**
 > - Lee todos los archivos YAML de `baremetal/nodes/` (excepto `jumpstart`).
 > - **Control Inteligente de Jumpstart**: Comprueba automáticamente si la VM de aprovisionamiento `jumpstart` está encendida. Si está apagada, la **enciende automáticamente en segundo plano (headless)** para garantizar que el servidor DHCP/PXE responda a los clientes. Si la VM ni siquiera está creada en VirtualBox, detiene el despliegue con un aviso explicativo.
 > - Comprueba si alguna VM de la maqueta ya existe de un despliegue anterior.
@@ -66,17 +66,17 @@ python3 orchestrate.py --action deploy
 > **Despliegue Quirúrgico de un Solo Nodo (Altamente Recomendado para la Defensa):**
 > Si solo quieres desplegar o recrear una VM específica sin alterar el estado de las demás (por ejemplo, para recrear únicamente el balanceador de carga o un puesto de hotdesk), puedes añadir el parámetro `--node <nombre-nodo>`:
 > ```bash
-> python3 orchestrate.py --action deploy --node load-balancer
+> ./orchestrate.py deploy load-balancer
 > ```
 > De esta forma, el orquestador apagará, eliminará y volverá a crear **únicamente** la VM de `load-balancer`, dejando intacto el resto de tu clúster que ya esté configurado por Ansible. Esto mismo aplica para la acción de limpieza selectiva:
 > ```bash
-> python3 orchestrate.py --action undeploy --node load-balancer
+> ./orchestrate.py undeploy load-balancer
 > ```
 
 ### Paso extra: Limpieza Total (Undeploy)
 Si en algún momento quieres desmontar por completo la maqueta de VirtualBox de tu Host anfitrión para liberar espacio en disco o recursos, ejecuta el comando de desinstalación:
 ```bash
-python3 orchestrate.py --action undeploy
+./orchestrate.py undeploy
 ```
 > [!NOTE]
 > Este comando apagará de forma segura y eliminará de raíz todas las VMs de la maqueta (excepto tu nodo `jumpstart` manual, que se mantendrá siempre a salvo).
@@ -95,7 +95,7 @@ python3 orchestrate.py --action undeploy
 > - Instala `isc-dhcp-server`, `tftpd-hpa` y `apache2`.
 > - Genera la clave pública SSH corporativa en `/root/.ssh/id_rsa.pub` (esencial para que luego tu compañero trabaje con Ansible).
 > - Descarga de forma segura la ISO de Ubuntu 22.04.5 LTS si no está en caché, la monta temporalmente y copia el kernel (`vmlinuz`) e `initrd` al servidor TFTP.
-> - Ejecuta `orchestrate.py --action generate-configs` (vía `../orchestrate.py` desde `baremetal/`) que lee los YAMLs y genera en caliente `/etc/dhcp/dhcpd.conf`, todos los menús PXE y todas las plantillas de `user-data` de autoinstalación.
+> - Ejecuta `orchestrate.py generate-configs` (vía `../orchestrate.py` desde `baremetal/`) que lee los YAMLs y genera en caliente `/etc/dhcp/dhcpd.conf`, todos los menús PXE y todas las plantillas de `user-data` de autoinstalación.
 > - Levanta y arranca todos los servicios.
 
 ---
@@ -127,8 +127,8 @@ Vuestro sistema dinámico es **perfecto** para esta dinámica:
 Hemos ejecutado las siguientes pruebas en el entorno local de tu espacio de trabajo para asegurar que el código es robusto y está listo:
 
 1. **Validación Sintáctica de los YAMLs**:
-   * Comando: `python3 orchestrate.py --action validate`
+   * Comando: `./orchestrate.py validate`
    * Resultado: **Éxito (0 errores, 0 advertencias).** Verifica que todas las IPs son únicas, las MACs son correctas, y no hay colisiones entre la red `main` y la `internal`.
 2. **Generación en Caliente Local de Pruebas**:
-   * Comando: `python3 orchestrate.py --action generate-configs`
+   * Comando: `./orchestrate.py generate-configs`
    * Resultado: **Éxito.** Generó localmente en las carpetas `dhcp/`, `pxe/` y `autoinstall/` bajo la subcarpeta del orquestador las 17 configuraciones independientes de los clientes (excluyendo el nodo Jumpstart), verificando que el motor de interpolación de plantillas Netplan es correcto.

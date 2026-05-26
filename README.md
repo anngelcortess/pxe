@@ -64,17 +64,17 @@ Para profundizar en la implementación y preparar la defensa del proyecto, consu
 
 1. **Validar consistencia de los YAML de nodos y redes**:
    ```bash
-   python3 orchestrate.py --action validate
+   ./orchestrate.py validate
    ```
 
 2. **Desplegar y arrancar la maqueta cliente en VirtualBox (Headless)**:
    ```bash
-   python3 orchestrate.py --action deploy
+   ./orchestrate.py deploy
    ```
 
 3. **Eliminar y limpiar de raíz las VMs clientes de VirtualBox**:
    ```bash
-   python3 orchestrate.py --action undeploy
+   ./orchestrate.py undeploy
    ```
 
 ### En el Servidor Jumpstart (Máquina de Aprovisionamiento)

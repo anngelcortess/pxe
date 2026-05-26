@@ -162,7 +162,7 @@ echo -e "${YELLOW}[*] Ejecutando orquestador de nodos para generar configuracion
 chmod +x ../orchestrate.py
 
 # Ejecutar la acción de generación de configuraciones del orquestador en caliente
-python3 ../orchestrate.py --action generate-configs
+../orchestrate.py generate-configs
 
 # 10. Iniciar y habilitar todos los servicios del Jumpstart
 echo -e "${YELLOW}[*] Iniciando y habilitando servicios de red...${NC}"
