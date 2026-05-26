@@ -35,3 +35,5 @@ autoinstall:
   late-commands:
     - "curtin in-target systemctl disable apt-daily.timer apt-daily-upgrade.timer"
     - "curtin in-target systemctl disable unattended-upgrades.service"
+    # Notificar al jumpstart que la instalación ha terminado (anti-loop PXE + lanzar Ansible)
+    - "curl -sf http://192.168.1.254:8081/node-ready?node=hotdesk-1 || true"

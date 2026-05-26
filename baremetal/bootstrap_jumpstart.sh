@@ -184,7 +184,8 @@ CALLBACK_SERVICE_SRC="${REPO_DIR}/baremetal/provision-callback.service"
 sed "s|/root/trabajo|${REPO_DIR}|g" "$CALLBACK_SERVICE_SRC" > /etc/systemd/system/provision-callback.service
 
 systemctl daemon-reload
-systemctl enable --now provision-callback
+systemctl enable provision-callback
+systemctl restart provision-callback
 echo -e "${GREEN}[+] Servicio provision-callback activo en el puerto 8081.${NC}"
 echo -e "    Diagnóstico: curl http://localhost:8081/health"
 

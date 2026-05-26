@@ -39,3 +39,5 @@ autoinstall:
     # Opcional: Desactivar swap (requerido para Kubernetes, no daña si se usa Swarm)
     - "curtin in-target swapoff -a"
     - "curtin in-target sed -i '/swap/d' /etc/fstab"
+    # Notificar al jumpstart que la instalación ha terminado (anti-loop PXE + lanzar Ansible)
+    - "curl -sf http://192.168.2.254:8081/node-ready?node=cluster-master-2 || true"
