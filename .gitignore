@@ -35,4 +35,6 @@ env/
 # Sistema Operativo
 .DS_Store
 Thumbs.db
-EOF
+
+# Configuraciones generadas dinamicamente
+.local_output/

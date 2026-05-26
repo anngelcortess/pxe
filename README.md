@@ -12,24 +12,27 @@ La estructura actual de la raíz del proyecto es limpia y modular, habiendo elim
 
 ```text
 trabajo/
-├── GAR_P1.pdf                     # Enunciado oficial del proyecto
+├── docs/                          # 📘 Documentación del proyecto y enunciado
+│   ├── GAR_P1.pdf
+│   ├── plan.md
+│   ├── walkthrough.md
+│   └── task.md
+├── config/                        # ⚙️ Configuración y definiciones YAML
+│   ├── networks.yml               # Definición de subredes
+│   └── nodes/                     # Directorio con archivos YAML de nodos
+├── templates/                     # 📄 Plantillas base de Autoinstall
+│   ├── meta-data
+│   └── user-data
+├── scripts/                       # 🛠️ Scripts auxiliares y de bootstrap
+│   ├── bootstrap_jumpstart.sh     # Inicialización del Jumpstart
+│   └── provision_callback.py      # Servidor HTTP de callback
+├── services/                      # ⚙️ Archivos de configuración de systemd
+│   └── provision-callback.service
+├── gar_orchestrator/              # 📦 Código fuente del orquestador
+├── provisioner.py                 # 🚀 CLI principal de aprovisionamiento
+├── vbox_api_server.py             # 🔌 Servidor API para VirtualBox
 ├── README.md                      # Este portal de inicio
-├── .gitignore                     # Escudo de exclusión (logs de VirtualBox, ISOs, VDIs)
-├── orchestrate.py                 # Orquestador dinámico en Python 3 (renombrado y movido)
-│
-├── docs/                          # 📘 Documentación detallada del sistema
-│   ├── plan.md                    # Plan de diseño arquitectónico y YAMLs
-│   ├── walkthrough.md             # Guía paso a paso, despliegue y defensa ante el profesor
-│   └── task.md                    # Checklist y control de calidad de tareas completadas
-│
-└── baremetal/                     # 🛠️ Código fuente de aprovisionamiento
-    ├── bootstrap_jumpstart.sh     # Script automatizado de bootstrap del servidor Jumpstart
-    ├── networks.yml               # Parametrización dinámica de subredes
-    ├── nodes/                     # Directorio con los 18 archivos YAML de definición de nodos
-    ├── templates/                 # Plantillas de autoinstalación (user-data y meta-data)
-    ├── dhcp/                      # Directorio de salida DHCP (pruebas locales)
-    ├── pxe/                       # Directorio de salida menús PXELINUX (pruebas locales)
-    └── autoinstall/               # Directorio de salida perfiles interpolados (pruebas locales)
+└── .gitignore                     # Escudo de exclusión (salida local, etc.)
 ```
 
 ---
@@ -38,7 +41,7 @@ trabajo/
 
 1. **Modelado Dinámico YAML-driven**:
    * Las subredes (`networks.yml`) y cada nodo de la maqueta (`nodes/*.yml`) se definen de forma desacoplada. Añadir, modificar o eliminar nodos o subredes escala la infraestructura de manera automática sin tocar una sola línea de código.
-2. **Orquestador Modular en Python (`orchestrate.py`)**:
+2. **Aprovisionador Modular en Python (`provisioner.py`)**:
    * Implementa un cargador YAML inteligente con parser de *fallback* nativo (para poder ejecutarse en entornos mínimos sin dependencias como `PyYAML`).
    * Soporta validación estricta de IPs y MACs (`--action validate`) para evitar conflictos de red.
    * Maneja el ciclo de vida de VirtualBox (`deploy`/`undeploy`) recreando discos VDI y redes de forma limpia.
@@ -64,22 +67,38 @@ Para profundizar en la implementación y preparar la defensa del proyecto, consu
 
 1. **Validar consistencia de los YAML de nodos y redes**:
    ```bash
-   ./orchestrate.py validate
+   ./provisioner.py validate
    ```
 
 2. **Desplegar y arrancar la maqueta cliente en VirtualBox (Headless)**:
    ```bash
-   ./orchestrate.py deploy
+   ./provisioner.py deploy
    ```
 
 3. **Eliminar y limpiar de raíz las VMs clientes de VirtualBox**:
    ```bash
-   ./orchestrate.py undeploy
+   ./provisioner.py undeploy
+   ```
+
+4. **Iniciar las VMs de la maqueta (excepto jumpstart)**:
+   ```bash
+   # Iniciar todas las VMs en segundo plano (headless)
+   ./provisioner.py start
+   # Iniciar una VM específica en modo interfaz gráfica (GUI)
+   ./provisioner.py start web-frontend-1 --type gui
+   ```
+
+5. **Detener las VMs de la maqueta (excepto jumpstart)**:
+   ```bash
+   # Apagar todas las VMs inmediatamente (poweroff)
+   ./provisioner.py stop
+   # Guardar estado de una VM específica (suspend)
+   ./provisioner.py stop cluster-worker-1 --mode savestate
    ```
 
 ### En el Servidor Jumpstart (Máquina de Aprovisionamiento)
 
 1. **Configurar todos los servicios PXE/DHCP/HTTP en caliente**:
    ```bash
-   sudo ./baremetal/bootstrap_jumpstart.sh
+    sudo ./scripts/bootstrap_jumpstart.sh
    ```

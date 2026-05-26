@@ -14,10 +14,6 @@
 #   python3 vbox_api_server.py
 #   python3 vbox_api_server.py --port 7070 --bind 192.168.56.1
 #
-# Instalar como servicio de usuario systemd (recomendado):
-#   mkdir -p ~/.config/systemd/user
-#   sed "s|REPO_PATH|$(pwd)|g" vbox-api.service > ~/.config/systemd/user/vbox-api.service
-#   systemctl --user daemon-reload && systemctl --user enable --now vbox-api
 #
 # Verificar desde el Jumpstart:
 #   curl http://192.168.56.1:7070/health
@@ -31,6 +27,8 @@ import logging
 import sys
 import argparse
 from urllib.parse import urlparse, parse_qs
+import threading
+import time
 
 # ── Configuración por defecto ──────────────────────────────────────────────────
 DEFAULT_PORT = 7070
@@ -193,12 +191,29 @@ class VBoxAPIHandler(http.server.BaseHTTPRequestHandler):
             for i, b in enumerate(boot, 1):
                 args += [f"--boot{i}", b]
 
-            ok, out = vbox("modifyvm", sanitize_vm_name(vm_name), *args)
-            if ok:
-                order_str = " → ".join(b for b in boot if b != "none") or "none"
-                self._ok(message=f'Boot order de "{vm_name}" actualizado: {order_str}')
-            else:
-                self._error(500, out)
+            def apply_boot_order_bg():
+                log.info(f"[{vm_name}] Comprobando estado de la VM antes de cambiar el orden de arranque...")
+                max_retries = 90 # 3 minutos
+                for _ in range(max_retries):
+                    # Consultar estado de forma segura sin modificar nada
+                    ok, out = vbox("showvminfo", sanitize_vm_name(vm_name), "--machinereadable")
+                    if ok and 'VMState="poweroff"' in out:
+                        log.info(f"[{vm_name}] La VM se ha apagado. Aplicando configuración...")
+                        bg_ok, bg_out = vbox("modifyvm", sanitize_vm_name(vm_name), *args)
+                        if bg_ok:
+                            log.info(f"[{vm_name}] ¡Orden de arranque actualizado! Encendiendo VM...")
+                            vbox("startvm", sanitize_vm_name(vm_name), "--type", "headless")
+                        else:
+                            log.error(f"[{vm_name}] Error al modificar el boot order: {bg_out}")
+                        return
+                    # Si sigue encendida, esperamos 2 segundos y volvemos a preguntar
+                    time.sleep(2)
+                
+                log.error(f"[{vm_name}] Timeout: la VM no se apagó tras 3 minutos de espera.")
+
+            # Responder 200 OK inmediatamente al curl para que la VM pueda seguir su curso y apagarse
+            threading.Thread(target=apply_boot_order_bg, daemon=True).start()
+            self._ok(message=f'Operación puesta en cola. Esperando a que "{vm_name}" se apague de forma segura para aplicar los cambios.')
 
         # POST /vbox/start
         # Body: {"vm": "nombre", "type": "headless"}  (type opcional, default headless)

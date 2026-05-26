@@ -1,0 +1,26 @@
+[Unit]
+Description=GAR — Servidor de Callback de Aprovisionamiento PXE
+Documentation=https://github.com/adriandpr84/pxe
+After=network-online.target apache2.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Ejecutar como root para poder escribir en /srv/tftp y lanzar Ansible con la clave de root
+User=root
+Group=root
+
+# Ruta al script de callback — ajustar si el repositorio está en otra ubicación
+ExecStart=/usr/bin/python3 /root/trabajo/scripts/provision_callback.py
+
+# Reiniciar si el proceso muere inesperadamente
+Restart=on-failure
+RestartSec=5s
+
+# Logs al journal de systemd (ver con: journalctl -u provision-callback -f)
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=provision-callback
+
+[Install]
+WantedBy=multi-user.target

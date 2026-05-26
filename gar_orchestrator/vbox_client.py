@@ -53,12 +53,8 @@ def _change_boot_order(host_api_url, name):
 def _resolve_playbook_path(node_type, templates_dir):
     """Resuelve la ruta del playbook Ansible correspondiente al tipo de nodo."""
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    if templates_dir is None:
-        playbooks_dir = os.path.normpath(os.path.join(script_dir, '..', 'playbooks'))
-    else:
-        playbooks_dir = os.path.normpath(
-            os.path.join(os.path.dirname(templates_dir), '..', 'playbooks')
-        )
+    repo_root = os.path.dirname(script_dir)
+    playbooks_dir = os.path.join(repo_root, 'playbooks')
 
     playbook_path = os.path.join(playbooks_dir, f'{node_type}.yml')
     if not os.path.exists(playbook_path):
@@ -163,3 +159,31 @@ def undeploy_virtualbox_vms(nodes, host_api_url):
         print(f"[+] Éxito: {result.get('message', 'Desinstalación completada')}")
         for msg in result.get('details', []):
             print(f"    - {msg}")
+
+def start_virtualbox_vms(nodes, host_api_url, vm_type="headless"):
+    """Inicia las VMs a través de la API del Host."""
+    print(f"[*] Iniciando {len(nodes)} VMs a través de la API del Host...")
+    for node in nodes:
+        name = node.get('name')
+        if name == 'jumpstart':
+            continue
+        print(f"[*] Iniciando VM '{name}' ({vm_type})...")
+        result = _make_api_request(host_api_url, "/vbox/start", {"vm": name, "type": vm_type})
+        if result and result.get("status") == "ok":
+            print(f"[+] Éxito: {result.get('message')}")
+        else:
+            print(f"[-] Error al iniciar '{name}': {result.get('message') if result else 'Sin respuesta'}")
+
+def stop_virtualbox_vms(nodes, host_api_url, mode="poweroff"):
+    """Detiene las VMs a través de la API del Host."""
+    print(f"[*] Deteniendo {len(nodes)} VMs a través de la API del Host...")
+    for node in nodes:
+        name = node.get('name')
+        if name == 'jumpstart':
+            continue
+        print(f"[*] Deteniendo VM '{name}' ({mode})...")
+        result = _make_api_request(host_api_url, "/vbox/stop", {"vm": name, "mode": mode})
+        if result and result.get("status") == "ok":
+            print(f"[+] Éxito: {result.get('message')}")
+        else:
+            print(f"[-] Error al detener '{name}': {result.get('message') if result else 'Sin respuesta'}")
