@@ -47,6 +47,9 @@ def main():
         print("[-] Error: No se encontraron definiciones de nodos YAML.")
         sys.exit(1)
         
+    jumpstart_node = next((n for n in nodes if n.get('name') == 'jumpstart'), {})
+    host_api_url = jumpstart_node.get('host_api_url', '').strip().rstrip('/')
+        
     if args.action == 'validate':
         success = validate_nodes(nodes)
         sys.exit(0 if success else 1)
@@ -62,7 +65,7 @@ def main():
             if not deploy_nodes:
                 print(f"[-] Error: El nodo '{args.node}' no está definido en los archivos YAML del directorio '{args.nodes_dir}'.")
                 sys.exit(1)
-        deploy_virtualbox_vms(deploy_nodes, args.vm_dir)
+        deploy_virtualbox_vms(deploy_nodes, host_api_url, args.vm_dir)
         
     elif args.action == 'undeploy':
         if not validate_nodes(nodes):
@@ -75,7 +78,7 @@ def main():
             if not undeploy_nodes:
                 print(f"[-] Error: El nodo '{args.node}' no está definido en los archivos YAML del directorio '{args.nodes_dir}'.")
                 sys.exit(1)
-        undeploy_virtualbox_vms(undeploy_nodes)
+        undeploy_virtualbox_vms(undeploy_nodes, host_api_url)
         
     elif args.action == 'generate-configs':
         if not validate_nodes(nodes):
@@ -91,7 +94,7 @@ def main():
         script_dir = os.path.dirname(os.path.abspath(__file__))
         is_live = os.path.exists('/srv/tftp')
         tftp_pxe_dir = '/srv/tftp/pxelinux.cfg' if is_live else os.path.join(script_dir, 'baremetal', 'pxe', 'pxelinux.cfg')
-        success = finalize_node(args.node, nodes, tftp_pxe_dir=tftp_pxe_dir, templates_dir=args.templates_dir)
+        success = finalize_node(args.node, nodes, host_api_url, tftp_pxe_dir=tftp_pxe_dir, templates_dir=args.templates_dir)
         sys.exit(0 if success else 1)
 
 if __name__ == '__main__':

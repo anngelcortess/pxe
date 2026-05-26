@@ -100,7 +100,7 @@ def _run_ansible_playbook(playbook_path, node_ip, name):
         print(f"[!] El playbook terminó con errores (código {result.returncode}).")
         return False
 
-def finalize_node(name, nodes, tftp_pxe_dir=None, templates_dir=None):
+def finalize_node(name, nodes, host_api_url, tftp_pxe_dir=None, templates_dir=None):
     """
     Finaliza el aprovisionamiento de un nodo tras su instalación.
     """
@@ -112,9 +112,6 @@ def finalize_node(name, nodes, tftp_pxe_dir=None, templates_dir=None):
     node_type = node.get('type', 'generic')
     node_networks = node.get('networks', [])
     node_ip = node_networks[0].get('ip') if node_networks else None
-
-    jumpstart_node = next((n for n in nodes if n.get('name') == 'jumpstart'), {})
-    host_api_url = jumpstart_node.get('host_api_url', '').strip().rstrip('/')
 
     if not host_api_url:
         print(f"[-] Error: 'host_api_url' no está configurado en el nodo jumpstart.")
@@ -143,28 +140,24 @@ def finalize_node(name, nodes, tftp_pxe_dir=None, templates_dir=None):
     _run_ansible_playbook(playbook_path, node_ip, name)
     return True
 
-def deploy_virtualbox_vms(nodes, vm_dir=None):
+def deploy_virtualbox_vms(nodes, host_api_url, vm_dir=None):
     """Hace una petición a la API del Host para desplegar las VMs."""
     print("[*] Iniciando despliegue (deploy) de la maqueta a través de la API del Host...")
-    jumpstart_node = next((n for n in nodes if n.get('name') == 'jumpstart'), {})
-    api_url = jumpstart_node.get('host_api_url', '').rstrip('/')
     
     print(f"[*] Enviando especificaciones de {len(nodes)} nodos a la API del Host...")
-    result = _make_api_request(api_url, "/vbox/deploy", {"nodes": nodes})
+    result = _make_api_request(host_api_url, "/vbox/deploy", {"nodes": nodes})
     
     if result:
         print(f"[+] Éxito: {result.get('message', 'Despliegue completado')}")
         for msg in result.get('details', []):
             print(f"    - {msg}")
 
-def undeploy_virtualbox_vms(nodes):
+def undeploy_virtualbox_vms(nodes, host_api_url):
     """Hace una petición a la API del Host para eliminar todas las VMs."""
     print("[*] Iniciando desinstalación (undeploy) de la maqueta a través de la API del Host...")
-    jumpstart_node = next((n for n in nodes if n.get('name') == 'jumpstart'), {})
-    api_url = jumpstart_node.get('host_api_url', '').rstrip('/')
     
     print(f"[*] Enviando petición de borrado a la API del Host...")
-    result = _make_api_request(api_url, "/vbox/undeploy", {"nodes": nodes})
+    result = _make_api_request(host_api_url, "/vbox/undeploy", {"nodes": nodes})
     
     if result:
         print(f"[+] Éxito: {result.get('message', 'Desinstalación completada')}")
