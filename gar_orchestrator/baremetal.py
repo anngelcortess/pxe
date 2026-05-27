@@ -63,7 +63,7 @@ def _make_api_request(api_url, path, payload_dict):
         print(f"[{RED}!{NC}] Error inesperado al llamar a la API {endpoint}: {e}")
         return None
 
-def _change_boot_order(host_api_url, name):
+def change_boot_order_to_disk(host_api_url, name):
     """Cambia el orden de arranque de una VM para que inicie desde disco."""
     print(f"[*] Cambiando orden de arranque de '{name}' a disco primero...")
     result = _make_api_request(host_api_url, "/vbox/set-boot-order", {
@@ -79,91 +79,6 @@ def _change_boot_order(host_api_url, name):
         print(f"    VBoxManage modifyvm '{name}' --boot1 disk --boot2 net")
         return False
 
-def _resolve_playbook_path(node_type, templates_dir):
-    """Resuelve la ruta del playbook Ansible correspondiente al tipo de nodo."""
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    repo_root = os.path.dirname(script_dir)
-    playbooks_dir = os.path.join(repo_root, 'playbooks')
-
-    playbook_path = os.path.join(playbooks_dir, f'{node_type}.yml')
-    if not os.path.exists(playbook_path):
-        playbook_path = os.path.join(playbooks_dir, 'generic.yml')
-        
-    return playbook_path
-
-def _wait_for_ssh(node_ip, name, max_wait=600):
-    """Espera hasta que el puerto 22 (SSH) del nodo esté disponible."""
-    print(f"[*] Esperando a que '{name}' ({node_ip}) responda por SSH tras el reinicio...")
-    elapsed = 0
-    while elapsed < max_wait:
-        try:
-            with socket.create_connection((node_ip, 22), timeout=3):
-                return True
-        except (socket.timeout, ConnectionRefusedError, OSError):
-            pass
-        time.sleep(5)
-        elapsed += 5
-        
-    print(f"[!] Timeout ({max_wait}s) esperando SSH de '{name}'.")
-    return False
-
-def _run_ansible_playbook(playbook_path, node_ip, name):
-    """Ejecuta el playbook Ansible para configurar un nodo."""
-    print(f"[+] SSH de '{name}' disponible. Lanzando Ansible...")
-    result = subprocess.run(
-        [
-            'ansible-playbook', playbook_path,
-            '-i', f'{node_ip},',
-            '--ssh-extra-args', '-o StrictHostKeyChecking=no'
-        ],
-        text=True
-    )
-    if result.returncode == 0:
-        print(f"[+] Playbook completado con éxito para '{name}'.")
-        return True
-    else:
-        print(f"[!] El playbook terminó con errores (código {result.returncode}).")
-        return False
-
-def finalize_node(name, nodes, host_api_url, tftp_pxe_dir=None, templates_dir=None):
-    """
-    Finaliza el aprovisionamiento de un nodo tras su instalación.
-    """
-    node = next((n for n in nodes if n.get('name') == name), None)
-    if not node:
-        print(f"[-] finalize_node: nodo '{name}' no encontrado en los YAMLs.")
-        return False
-
-    node_type = node.get('type', 'generic')
-    node_networks = node.get('networks', [])
-    node_ip = node_networks[0].get('ip') if node_networks else None
-
-    if not host_api_url:
-        print(f"[-] Error: 'host_api_url' no está configurado en el nodo jumpstart.")
-        return False
-
-    # 1. Cambiar boot order
-    boot_ok = _change_boot_order(host_api_url, name)
-
-    # 2. Resolver Playbook
-    playbook_path = _resolve_playbook_path(node_type, templates_dir)
-    
-    if not node_ip:
-        print(f"[!] No se pudo determinar la IP de '{name}'. Saltando Ansible.")
-        return boot_ok
-
-    if not os.path.exists(playbook_path):
-        print(f"[!] No se encontró playbook en '{playbook_path}'. Saltando Ansible.")
-        print(f"    Crea 'playbooks/{node_type}.yml' para automatizar.")
-        return boot_ok
-
-    # 3. Esperar SSH
-    if not _wait_for_ssh(node_ip, name):
-        return boot_ok
-
-    # 4. Ejecutar Ansible
-    _run_ansible_playbook(playbook_path, node_ip, name)
-    return True
 
 def deploy_virtualbox_vms(nodes, host_api_url, vm_dir=None):
     """Hace una petición a la API del Host para desplegar las VMs."""

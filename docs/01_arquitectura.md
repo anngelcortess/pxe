@@ -42,7 +42,7 @@ Durante el aprovisionamiento baremetal, **todos** los nodos (incluso los de la r
   * **DHCP (`isc-dhcp-server`)**: Entrega IPs.
   * **TFTP (`tftpd-hpa`)**: Entrega el binario de PXE y el Kernel de Ubuntu.
   * **HTTP (`apache2`)**: Sirve los ficheros ISO y los YAMLs de Cloud-Init.
-  * **Callback Server (`provision_callback.py`)**: Microservicio crítico en el puerto `8081` que escucha los avisos de "Instalación Completada" de los nodos.
+  * **Config Manager Daemon (`provisioner.py listen-callbacks`)**: Demonio en el puerto `8081` que escucha los avisos de "Instalación Completada" de los nodos para inyectarles configuración con Ansible.
 
 ---
 

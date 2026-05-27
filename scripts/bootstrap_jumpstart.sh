@@ -207,16 +207,17 @@ systemctl enable isc-dhcp-server
 systemctl restart apache2
 systemctl enable apache2
 
-echo -e "${YELLOW}[*] Instalando servicio de callback de aprovisionamiento (provision-callback)...${NC}"
+echo -e "${YELLOW}[*] Instalando servicio de configuración de Ansible (config-manager)...${NC}"
 
-# Actualizar la ruta del ExecStart en el .service según la ubicación real del repo
-CALLBACK_SERVICE_SRC="${REPO_DIR}/services/provision-callback.service"
-sed "s|/root/trabajo|${REPO_DIR}|g" "$CALLBACK_SERVICE_SRC" > /etc/systemd/system/provision-callback.service
+# 10.1 Copiar el archivo de servicio
+CALLBACK_SERVICE_SRC="${REPO_DIR}/services/config-manager.service"
+sed "s|/root/trabajo|${REPO_DIR}|g" "$CALLBACK_SERVICE_SRC" > /etc/systemd/system/config-manager.service
 
+# 10.2 Recargar systemd y habilitar
 systemctl daemon-reload
-systemctl enable provision-callback
-systemctl restart provision-callback
-echo -e "${GREEN}[+] Servicio provision-callback activo en el puerto 8081.${NC}"
+systemctl enable config-manager
+systemctl restart config-manager
+echo -e "${GREEN}[+] Servicio config-manager activo en el puerto 8081.${NC}"
 echo -e "    Diagnóstico: curl http://localhost:8081/health"
 
 echo -e "${GREEN}====================================================${NC}"

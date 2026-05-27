@@ -6,7 +6,8 @@ import urllib.request
 
 from gar_orchestrator.parsers import load_all_nodes
 from gar_orchestrator.validators import validate_nodes
-from gar_orchestrator.vbox_client import deploy_virtualbox_vms, undeploy_virtualbox_vms, finalize_node, start_virtualbox_vms, stop_virtualbox_vms, get_existing_vms
+from gar_orchestrator.baremetal import deploy_virtualbox_vms, undeploy_virtualbox_vms, start_virtualbox_vms, stop_virtualbox_vms, get_existing_vms
+from gar_orchestrator.provisioning import run_callback_server, provision_nodes
 from gar_orchestrator.config_generator import generate_pxe_configs
 
 GREEN = '\033[92m'
@@ -44,12 +45,12 @@ def preflight_checks(host_api_url, need_vbox=False, need_callback=False):
         cb_url = "http://localhost:8081/health"
         if not _check_service(cb_url):
             errors.append(
-                f"  {RED}✗{NC} provision-callback (Jumpstart)\n"
+                f"  {RED}✗{NC} config-manager (Jumpstart)\n"
                 f"    No responde en: {cb_url}\n"
-                f"    → Arranca el servicio: systemctl start provision-callback"
+                f"    → Arranca el servicio: systemctl start config-manager"
             )
         else:
-            print(f"[{GREEN}✓{NC}] provision-callback (Jumpstart) — OK")
+            print(f"[{GREEN}✓{NC}] config-manager (Jumpstart) — OK")
 
     if errors:
         print(f"\n[{RED}-{NC}] Preflight check fallido. Servicios no disponibles:\n")
@@ -88,9 +89,13 @@ def main():
     # Subcomando: generate-configs
     parser_generate = subparsers.add_parser('generate-configs', parents=[parent_parser], help="Generar configuraciones PXE, DHCP y Autoinstall")
 
-    # Subcomando: finalize-node
-    parser_finalize = subparsers.add_parser('finalize-node', parents=[parent_parser], help="Finalizar aprovisionamiento de un nodo (uso interno)")
-    parser_finalize.add_argument('node', help="Nombre del nodo a finalizar")
+    # Subcomando: provision
+    parser_provision = subparsers.add_parser('provision', parents=[parent_parser], help="Aprovisionar software (Ansible) en las VMs saltándose la fase de baremetal")
+    parser_provision.add_argument('node', nargs='*', help="Nombres de los nodos a aprovisionar (opcional, por defecto todos)")
+
+    # Subcomando: listen-callbacks
+    parser_listen = subparsers.add_parser('listen-callbacks', parents=[parent_parser], help="Inicia el servidor demonio para escuchar peticiones de finalización PXE")
+    parser_listen.add_argument('--port', type=int, default=8081, help="Puerto de escucha (defecto: 8081)")
 
     # Subcomando: start
     parser_start = subparsers.add_parser('start', parents=[parent_parser], help="Iniciar las VMs en VirtualBox (excepto jumpstart)")
@@ -189,16 +194,14 @@ def main():
                 sys.exit(1)
         stop_virtualbox_vms(stop_nodes, host_api_url, args.mode)
 
-    elif args.action == 'finalize-node':
-        if not args.node:
-            print("[-] Error: la acción finalize-node requiere un nodo explícito.")
-            sys.exit(1)
-        preflight_checks(host_api_url, need_vbox=True)
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        is_live = os.path.exists('/srv/tftp')
-        tftp_pxe_dir = '/srv/tftp/pxelinux.cfg' if is_live else os.path.join(script_dir, '.local_output', 'pxe', 'pxelinux.cfg')
-        success = finalize_node(args.node, nodes, host_api_url, tftp_pxe_dir=tftp_pxe_dir, templates_dir=args.templates_dir)
-        sys.exit(0 if success else 1)
+    elif args.action == 'provision':
+        target_names = args.node if args.node else [n.get('name') for n in nodes if n.get('name') != 'jumpstart']
+        print(f"[*] Iniciando aprovisionamiento directo para: {', '.join(target_names)}")
+        provision_nodes(target_names, nodes, host_api_url, skip_boot_order=True)
+
+    elif args.action == 'listen-callbacks':
+        # Bloquea el hilo principal atendiendo peticiones HTTP
+        run_callback_server(nodes, host_api_url, port=args.port)
 
 if __name__ == '__main__':
     main()

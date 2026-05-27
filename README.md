@@ -37,9 +37,9 @@ trabajo/
 │   └── user-data-*                # Plantillas específicas por rol (lb, web, db...)
 ├── scripts/                       # 🛠️ Scripts auxiliares y de automatización
 │   ├── bootstrap_jumpstart.sh     # Inicialización de servicios del Jumpstart
-│   └── provision_callback.py      # Microservicio HTTP de callback
+
 ├── services/                      # ⚙️ Archivos para demonios systemd
-│   ├── provision-callback.service
+│   ├── config-manager.service
 │   └── vbox-api.service
 ├── gar_orchestrator/              # 📦 Núcleo del orquestador en Python
 │   ├── config_generator.py        # Generador de DHCP, PXE, Netplan

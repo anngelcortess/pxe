@@ -24,7 +24,7 @@ Este archivo proporciona contexto crítico, reglas de arquitectura y convencione
 3. **Flujo de Autoinstalación:**
    * Usamos PXELINUX + Ubuntu Autoinstall (Cloud-Init/Subiquity).
    * Al finalizar la instalación, las VMs **deben apagarse** (`shutdown -P now`) y lanzar un POST a `http://192.168.1.254:8081`. 
-   * El microservicio `provision_callback.py` del Jumpstart capta este POST, pide al Host que cambie el orden de arranque a "Disco Duro" y reenciende la VM. **NO rompas este flujo o causarás bucles de reinstalación infinitos**.
+   * El demonio `provisioner.py listen-callbacks` del Jumpstart capta este POST, pide al Host que cambie el orden de arranque a "Disco Duro" y lanza Ansible. **NO rompas este flujo o causarás bucles de reinstalación infinitos**.
 
 ---
 

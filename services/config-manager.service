@@ -1,5 +1,5 @@
 [Unit]
-Description=GAR — Servidor de Callback de Aprovisionamiento PXE
+Description=GAR Config Manager (Ansible Callback Server)
 Documentation=https://github.com/adriandpr84/pxe
 After=network-online.target apache2.service
 Wants=network-online.target
@@ -11,7 +11,7 @@ User=root
 Group=root
 
 # Ruta al script de callback — ajustar si el repositorio está en otra ubicación
-ExecStart=/usr/bin/python3 /root/trabajo/scripts/provision_callback.py
+ExecStart=/usr/bin/python3 /home/admin/pxe/provisioner.py listen-callbacks
 
 # Reiniciar si el proceso muere inesperadamente
 Restart=on-failure
