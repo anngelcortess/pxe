@@ -1,0 +1,6 @@
+name: cluster-worker-2
+type: cluster-node
+mac: "08:00:27:00:02:0D"
+networks:
+  - name: intnet_internal
+    ip: "192.168.2.13"

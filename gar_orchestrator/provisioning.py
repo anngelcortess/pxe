@@ -7,7 +7,7 @@ import logging
 import threading
 import http.server
 import urllib.parse
-from gar_orchestrator.baremetal import change_boot_order_to_disk
+from gar_orchestrator.baremetal import apply_post_install_specs
 
 GREEN = '\033[92m'
 YELLOW = '\033[93m'
@@ -94,7 +94,7 @@ def provision_nodes(target_nodes, nodes, host_api_url, skip_boot_order=False):
             continue
 
         if not skip_boot_order and host_api_url:
-            change_boot_order_to_disk(host_api_url, name)
+            apply_post_install_specs(host_api_url, node)
 
         if _wait_for_ssh(node_ip, name):
             _run_ansible_playbook(playbook_path, node_ip, name)

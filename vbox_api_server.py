@@ -204,8 +204,15 @@ class VBoxAPIHandler(http.server.BaseHTTPRequestHandler):
             for i, b in enumerate(boot, 1):
                 args += [f"--boot{i}", b]
 
+            ram_mb = body.get("ram_mb")
+            cpus = body.get("cpus")
+            if ram_mb:
+                args += ["--memory", str(ram_mb)]
+            if cpus:
+                args += ["--cpus", str(cpus)]
+
             def apply_boot_order_bg():
-                log.info(f"[{vm_name}] Comprobando estado de la VM antes de cambiar el orden de arranque...")
+                log.info(f"[{vm_name}] Comprobando estado de la VM antes de aplicar specs finales y orden de arranque...")
                 max_retries = 90 # 3 minutos
                 for _ in range(max_retries):
                     # Consultar estado de forma segura sin modificar nada

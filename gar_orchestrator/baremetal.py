@@ -63,38 +63,43 @@ def _make_api_request(api_url, path, payload_dict):
         print(f"[{RED}!{NC}] Error inesperado al llamar a la API {endpoint}: {e}")
         return None
 
-def change_boot_order_to_disk(host_api_url, name):
-    """Cambia el orden de arranque de una VM para que inicie desde disco."""
-    print(f"[*] Cambiando orden de arranque de '{name}' a disco primero...")
+def apply_post_install_specs(host_api_url, node):
+    """Cambia el orden de arranque a disco y aplica la memoria/cpu final de producción."""
+    name = node.get("name")
+    specs = node.get("vbox_specs", {})
+    print(f"[*] Aplicando orden de arranque y recursos finales a '{name}'...")
     result = _make_api_request(host_api_url, "/vbox/set-boot-order", {
         "vm": name,
-        "boot": ["disk", "net", "none", "none"]
+        "boot": ["disk", "net", "none", "none"],
+        "ram_mb": specs.get("ram_mb", 1024),
+        "cpus": specs.get("cpus", 1)
     })
     
     if result and result.get("status") == "ok":
-        print(f"[+] Éxito: {result.get('message', 'Orden de arranque actualizado')}")
+        print(f"[+] Éxito: {result.get('message', 'Orden de arranque y recursos actualizados')}")
         return True
     else:
         print(f"    Puedes cambiarlo manualmente en el Host con:")
-        print(f"    VBoxManage modifyvm '{name}' --boot1 disk --boot2 net")
+        print(f"    VBoxManage modifyvm '{name}' --boot1 disk --boot2 net --memory {specs.get('ram_mb', 1024)}")
         return False
 
 
 def deploy_virtualbox_vms(nodes, host_api_url, vm_dir=None):
-    """Hace una petición a la API del Host para desplegar las VMs."""
+    """Hace una petición a la API del Host para desplegar las VMs con recursos de aprovisionamiento."""
     vms_to_process = [n for n in nodes if n.get('name') != 'jumpstart']
     print(f"[{CYAN}*{NC}] Iniciando despliegue masivo (deploy) de {len(vms_to_process)} VMs a través de la API del Host...")
     
     # Transformando ("masticando") la configuración de los YAMLs
     payload_vms = []
     for node in vms_to_process:
+        prov = node.get("provisioning", {})
         specs = node.get("vbox_specs", {})
         payload_vms.append({
             "name": node.get("name"),
             "ostype": "Ubuntu_64",
-            "cpus": specs.get("cpus", 1),
-            "ram_mb": specs.get("ram_mb", 1024),
-            "disk_gb": specs.get("disk_gb", 20),
+            "cpus": prov.get("cpus", 2),
+            "ram_mb": prov.get("ram_mb", 7168),
+            "disk_gb": specs.get("disk_gb", 10),
             "vram": 16,
             "graphicscontroller": "vmsvga",
             "networks": node.get("networks", [])

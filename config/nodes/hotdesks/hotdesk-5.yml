@@ -1,0 +1,6 @@
+name: hotdesk-5
+type: hotdesk
+mac: "08:00:27:00:01:04"
+networks:
+  - name: intnet_main
+    ip: "192.168.1.104"

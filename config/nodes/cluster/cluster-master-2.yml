@@ -1,0 +1,6 @@
+name: cluster-master-2
+type: cluster-node
+mac: "08:00:27:00:02:0B"
+networks:
+  - name: intnet_internal
+    ip: "192.168.2.11"
