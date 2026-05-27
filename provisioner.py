@@ -94,9 +94,9 @@ def main():
     parser_provision = subparsers.add_parser('provision', parents=[parent_parser], help="Aprovisionar software (Ansible) en las VMs saltándose la fase de baremetal")
     parser_provision.add_argument('node', nargs='*', help="Nombres de los nodos a aprovisionar (opcional, por defecto todos)")
 
-    # Subcomando: listen-callbacks
-    parser_listen = subparsers.add_parser('listen-callbacks', parents=[parent_parser], help="Inicia el servidor demonio para escuchar peticiones de finalización PXE")
-    parser_listen.add_argument('--port', type=int, default=None, help="Puerto de escucha (defecto: valor en settings.yml)")
+    # Subcomando: listen-callbacks (Oculto al usuario, gestionado por systemd)
+    parser_listen = subparsers.add_parser('listen-callbacks', parents=[parent_parser], help=argparse.SUPPRESS)
+    parser_listen.add_argument('--port', type=int, default=None, help=argparse.SUPPRESS)
 
     # Subcomando: start
     parser_start = subparsers.add_parser('start', parents=[parent_parser], help="Iniciar las VMs en VirtualBox (excepto jumpstart)")
