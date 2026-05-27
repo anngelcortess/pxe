@@ -244,6 +244,3 @@ echo -e "${GREEN}  curl http://192.168.56.1:7070/health${NC}"
 echo ""
 echo -e "${BLUE}Próximo paso: Arrancar los nodos cliente en modo red PXE.${NC}"
 echo -e "${GREEN}====================================================${NC}"
-
-echo -e "Haciendo el script ejecutable..."
-chmod +x "$0"
