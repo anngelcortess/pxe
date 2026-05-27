@@ -185,14 +185,17 @@ if [ ! -f /root/.ssh/id_rsa ]; then
     echo -e "${GREEN}[+] Llave SSH generada.${NC}"
 fi
 
+# Determinar ruta del repositorio (un nivel arriba del directorio scripts)
+REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+
 # 9. Ejecutar el Aprovisionador dinámico en Python para generar DHCP, menús PXE y Autoinstalls
 echo -e "${YELLOW}[*] Ejecutando aprovisionador de nodos para generar configuraciones finales...${NC}"
 
 # Dar permisos de ejecución al script si no los tiene
-chmod +x ../provisioner.py
+chmod +x "${REPO_DIR}/provisioner.py"
 
 # Ejecutar la acción de generación de configuraciones del aprovisionador en caliente
-../provisioner.py generate-configs
+"${REPO_DIR}/provisioner.py" generate-configs
 
 # 10. Iniciar y habilitar todos los servicios del Jumpstart
 echo -e "${YELLOW}[*] Iniciando y habilitando servicios de red...${NC}"
@@ -205,9 +208,6 @@ systemctl restart apache2
 systemctl enable apache2
 
 echo -e "${YELLOW}[*] Instalando servicio de callback de aprovisionamiento (provision-callback)...${NC}"
-
-# Determinar ruta del repositorio (un nivel arriba del directorio scripts)
-REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 
 # Actualizar la ruta del ExecStart en el .service según la ubicación real del repo
 CALLBACK_SERVICE_SRC="${REPO_DIR}/services/provision-callback.service"
