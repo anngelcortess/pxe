@@ -99,6 +99,15 @@ class VBoxAPIHandler(http.server.BaseHTTPRequestHandler):
     def _error(self, code, message):
         self._json(code, {"status": "error", "message": message})
 
+    def _handle_vbox_error(self, err_output):
+        """Mapea errores conocidos de VBoxManage a códigos HTTP correctos."""
+        if "VBOX_E_OBJECT_NOT_FOUND" in err_output or "Could not find a registered machine" in err_output:
+            self._error(404, err_output)
+        elif "VBOX_E_INVALID_OBJECT_STATE" in err_output or "already locked" in err_output or "already running" in err_output:
+            self._error(409, err_output) # 409 Conflict
+        else:
+            self._error(500, err_output)
+
     def _read_body(self):
         length = int(self.headers.get("Content-Length", 0))
         if length == 0:
@@ -149,7 +158,7 @@ class VBoxAPIHandler(http.server.BaseHTTPRequestHandler):
                         info[k.strip()] = v.strip().strip('"')
                 self._ok(vm=vm_name, info=info)
             else:
-                self._error(500, out)
+                self._handle_vbox_error(out)
 
         else:
             self._error(404, f"Ruta no encontrada: {path}")
@@ -232,7 +241,7 @@ class VBoxAPIHandler(http.server.BaseHTTPRequestHandler):
             if ok:
                 self._ok(message=f'VM "{vm_name}" iniciada en modo {vm_type}')
             else:
-                self._error(500, out)
+                self._handle_vbox_error(out)
 
         # POST /vbox/stop
         # Body: {"vm": "nombre", "mode": "poweroff"}  (mode opcional, default poweroff)
@@ -251,7 +260,7 @@ class VBoxAPIHandler(http.server.BaseHTTPRequestHandler):
             if ok:
                 self._ok(message=f'VM "{vm_name}" detenida ({mode})')
             else:
-                self._error(500, out)
+                self._handle_vbox_error(out)
 
         # POST /vbox/deploy
         # Body: {"nodes": [...]}
