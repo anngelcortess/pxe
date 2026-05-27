@@ -1,0 +1,234 @@
+---
+- name: Aprovisionamiento del Nodo Jumpstart
+  hosts: localhost
+  connection: local
+  become: yes
+  vars:
+    repo_dir: "{{ lookup('env', 'PWD') }}"
+    iso_url: "https://releases.ubuntu.com/22.04/ubuntu-22.04.5-live-server-amd64.iso"
+    iso_path: "/var/www/html/ubuntu-22.04/ubuntu-22.04.5-live-server-amd64.iso"
+
+  tasks:
+    - name: "RED: Desactivar configuración de cloud-init"
+      file:
+        path: /etc/cloud/cloud.cfg.d/99-disable-network-config.cfg
+        state: touch
+      when: false # Se simula con copy en la sig tarea
+
+    - name: "RED: Asegurar que cloud-init no gestiona la red"
+      copy:
+        dest: /etc/cloud/cloud.cfg.d/99-disable-network-config.cfg
+        content: "network: {config: disabled}\n"
+      ignore_errors: yes
+
+    - name: "RED: Eliminar configuración de red por defecto de cloud-init"
+      file:
+        path: /etc/netplan/50-cloud-init.yaml
+        state: absent
+
+    - name: "RED: Generar Netplan de las 4 interfaces"
+      copy:
+        dest: /etc/netplan/99-manual-networks.yaml
+        content: |
+          network:
+              version: 2
+              ethernets:
+                  enp0s3:
+                      dhcp4: true
+                  enp0s8:
+                      dhcp4: false
+                      addresses:
+                          - 192.168.56.10/24
+                  enp0s9:
+                      dhcp4: false
+                      addresses:
+                          - 192.168.1.254/24
+                  enp0s10:
+                      dhcp4: false
+                      addresses:
+                          - 192.168.2.254/24
+      notify: Aplicar Netplan
+
+    - name: "NAT: Habilitar IP Forwarding"
+      sysctl:
+        name: net.ipv4.ip_forward
+        value: '1'
+        sysctl_set: yes
+        state: present
+        reload: yes
+
+    - name: "NAT: Instalar iptables-persistent"
+      apt:
+        name: iptables-persistent
+        state: present
+      environment:
+        DEBIAN_FRONTEND: noninteractive
+
+    - name: "NAT: Enmascarar tráfico saliente (MASQUERADE)"
+      iptables:
+        table: nat
+        chain: POSTROUTING
+        out_interface: enp0s3
+        jump: MASQUERADE
+
+    - name: "NAT: Permitir Forwarding desde red Main (enp0s9)"
+      iptables:
+        chain: FORWARD
+        in_interface: enp0s9
+        out_interface: enp0s3
+        jump: ACCEPT
+
+    - name: "NAT: Permitir Forwarding desde red Internal (enp0s10)"
+      iptables:
+        chain: FORWARD
+        in_interface: enp0s10
+        out_interface: enp0s3
+        jump: ACCEPT
+
+    - name: "NAT: Permitir tráfico establecido/relacionado"
+      iptables:
+        chain: FORWARD
+        match: state
+        state: ESTABLISHED,RELATED
+        jump: ACCEPT
+
+    - name: "NAT: Guardar reglas de iptables"
+      command: netfilter-persistent save
+
+    - name: "SISTEMA: Instalar paquetes básicos"
+      apt:
+        name:
+          - tftpd-hpa
+          - isc-dhcp-server
+          - apache2
+          - syslinux
+          - pxelinux
+          - syslinux-common
+          - wget
+          - python3
+          - python3-yaml
+          - python3-jinja2
+          - git
+        state: present
+        update_cache: yes
+
+    - name: "TFTP: Crear directorios"
+      file:
+        path: "{{ item }}"
+        state: directory
+        owner: tftp
+        group: tftp
+        mode: '0755'
+      with_items:
+        - /srv/tftp/pxelinux.cfg
+        - /srv/tftp/images/ubuntu-22.04
+
+    - name: "TFTP: Copiar pxelinux.0"
+      copy:
+        src: /usr/lib/PXELINUX/pxelinux.0
+        dest: /srv/tftp/pxelinux.0
+        remote_src: yes
+
+    - name: "TFTP: Copiar módulos c32"
+      shell: cp /usr/lib/syslinux/modules/bios/*.c32 /srv/tftp/
+      args:
+        creates: /srv/tftp/menu.c32
+
+    - name: "TFTP: Configurar demonio"
+      copy:
+        dest: /etc/default/tftpd-hpa
+        content: |
+          TFTP_USERNAME="tftp"
+          TFTP_DIRECTORY="/srv/tftp"
+          TFTP_ADDRESS=":69"
+          TFTP_OPTIONS="--secure"
+      notify: Reiniciar TFTP
+
+    - name: "DHCP: Configurar interfaces"
+      copy:
+        dest: /etc/default/isc-dhcp-server
+        content: |
+          INTERFACESv4="enp0s9 enp0s10"
+          INTERFACESv6=""
+      notify: Reiniciar DHCP
+
+    - name: "HTTP: Crear directorio para ISOs"
+      file:
+        path: /var/www/html/ubuntu-22.04
+        state: directory
+        owner: www-data
+        group: www-data
+        mode: '0755'
+
+    - name: "HTTP: Descargar ISO de Ubuntu (Esto tardará unos minutos...)"
+      get_url:
+        url: "{{ iso_url }}"
+        dest: "{{ iso_path }}"
+        mode: '0644'
+
+    - name: "PXE: Extraer Kernel e Initrd de la ISO"
+      shell: |
+        mkdir -p /mnt/ubuntu-iso-temp
+        mount -o loop,ro {{ iso_path }} /mnt/ubuntu-iso-temp
+        cp /mnt/ubuntu-iso-temp/casper/vmlinuz /srv/tftp/images/ubuntu-22.04/
+        cp /mnt/ubuntu-iso-temp/casper/initrd /srv/tftp/images/ubuntu-22.04/
+        umount /mnt/ubuntu-iso-temp
+        rmdir /mnt/ubuntu-iso-temp
+      args:
+        creates: /srv/tftp/images/ubuntu-22.04/vmlinuz
+
+    - name: "SSH: Asegurar que el usuario root tiene un par de claves"
+      user:
+        name: root
+        generate_ssh_key: yes
+        ssh_key_bits: 2048
+        ssh_key_file: .ssh/id_rsa
+
+    - name: "ORQUESTADOR: Generar configuraciones finales (PXE/DHCP/Autoinstall)"
+      command: "./provisioner.py generate-configs"
+      args:
+        chdir: "{{ repo_dir }}"
+      register: provisioner_out
+      changed_when: provisioner_out.rc == 0
+
+    - name: "ORQUESTADOR: Copiar config-manager.service"
+      copy:
+        src: "{{ repo_dir }}/services/config-manager.service"
+        dest: /etc/systemd/system/config-manager.service
+        remote_src: yes
+
+    - name: "ORQUESTADOR: Inyectar ruta del repositorio en config-manager.service"
+      replace:
+        path: /etc/systemd/system/config-manager.service
+        regexp: '/home/admin/pxe'
+        replace: "{{ repo_dir }}"
+      notify: Recargar e iniciar config-manager
+
+    - name: "SISTEMA: Habilitar y arrancar servicios (Apache)"
+      service:
+        name: apache2
+        state: started
+        enabled: yes
+
+  handlers:
+    - name: Aplicar Netplan
+      command: netplan apply
+    
+    - name: Reiniciar TFTP
+      service:
+        name: tftpd-hpa
+        state: restarted
+        enabled: yes
+        
+    - name: Reiniciar DHCP
+      service:
+        name: isc-dhcp-server
+        state: restarted
+        enabled: yes
+        
+    - name: Recargar e iniciar config-manager
+      systemd:
+        daemon_reload: yes
+        name: config-manager
+        state: restarted
+        enabled: yes

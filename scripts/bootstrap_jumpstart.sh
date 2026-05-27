@@ -18,209 +18,25 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m' # Sin color
 
-echo -e "${BLUE}=== INICIANDO BOOTSTRAP DEL SERVIDOR JUMPSTART ===${NC}"
+# ==============================================================================
+# Micro-Bootstrap: Instala Ansible y delega en el Playbook
+# ==============================================================================
 
-# 1. Verificar que se ejecuta como root
-if [ "$EUID" -ne 0 ]; then
-    echo -e "${RED}[-] Error: Este script debe ser ejecutado como root o con sudo.${NC}"
-    exit 1
-fi
+echo -e "${YELLOW}[*] Actualizando repositorios base e instalando Ansible...${NC}"
+apt-get update > /dev/null
+DEBIAN_FRONTEND=noninteractive apt-get install -y ansible git > /dev/null
 
-# 2. Identificar las interfaces de red de la máquina
-# Adaptadores VirtualBox del Jumpstart (4 interfaces):
-# - enp0s3:  NAT         (Salida a Internet - DHCP automático)
-# - enp0s8:  Host-Only   (Acceso SSH desde el Host - IP estática 192.168.56.10, fuera del rango DHCP .101-.254)
-# - enp0s9:  intnet_main (Red Main - IP estática 192.168.1.254)
-# - enp0s10: intnet_internal (Red Internal - IP estática 192.168.2.254)
-echo -e "${YELLOW}[*] Configurando interfaces de red (Netplan)...${NC}"
-
-# 2.1 Desactivar la configuración de red automática de cloud-init para que no pise nuestro Netplan al reiniciar
-if [ -d /etc/cloud/cloud.cfg.d ]; then
-    echo -e "${YELLOW}[*] Desactivando configuración de red de cloud-init para persistencia...${NC}"
-    echo "network: {config: disabled}" > /etc/cloud/cloud.cfg.d/99-disable-network-config.cfg
-fi
-
-# Eliminar el archivo por defecto de cloud-init para evitar conflictos
-rm -f /etc/netplan/50-cloud-init.yaml
-
-cat <<EOF > /etc/netplan/99-manual-networks.yaml
-network:
-    version: 2
-    ethernets:
-        enp0s3:
-            dhcp4: true
-        enp0s8:
-            dhcp4: false
-            addresses:
-                - 192.168.56.10/24
-        enp0s9:
-            dhcp4: false
-            addresses:
-                - 192.168.1.254/24
-        enp0s10:
-            dhcp4: false
-            addresses:
-                - 192.168.2.254/24
-EOF
-
-echo -e "${GREEN}[+] Archivo Netplan generado. Aplicando configuración...${NC}"
-netplan apply
-sleep 2
-
-# 2.2 Habilitar NAT para que los nodos aprovisionados tengan acceso a Internet
-# El Jumpstart actúa como router NAT durante el aprovisionamiento. Los nodos usan
-# al Jumpstart como gateway (192.168.1.254 / 192.168.2.254) y el Jumpstart reenvía
-# el tráfico hacia Internet a través de su interfaz NAT de VirtualBox (enp0s3).
-echo -e "${YELLOW}[*] Habilitando IP forwarding y NAT (MASQUERADE)...${NC}"
-
-# Activar reenvío de paquetes IP (inmediato + persistente)
-sysctl -w net.ipv4.ip_forward=1
-if ! grep -q "^net.ipv4.ip_forward=1" /etc/sysctl.conf 2>/dev/null; then
-    echo "net.ipv4.ip_forward=1" >> /etc/sysctl.conf
-fi
-
-# Reglas iptables: enmascarar todo lo que salga por enp0s3 (NAT de VirtualBox)
-iptables -t nat -C POSTROUTING -o enp0s3 -j MASQUERADE 2>/dev/null || \
-    iptables -t nat -A POSTROUTING -o enp0s3 -j MASQUERADE
-
-# Permitir forwarding desde las redes internas hacia Internet
-iptables -C FORWARD -i enp0s9 -o enp0s3 -j ACCEPT 2>/dev/null || \
-    iptables -A FORWARD -i enp0s9 -o enp0s3 -j ACCEPT   # main → internet
-iptables -C FORWARD -i enp0s10 -o enp0s3 -j ACCEPT 2>/dev/null || \
-    iptables -A FORWARD -i enp0s10 -o enp0s3 -j ACCEPT  # internal → internet (solo durante provisioning)
-iptables -C FORWARD -m state --state ESTABLISHED,RELATED -j ACCEPT 2>/dev/null || \
-    iptables -A FORWARD -m state --state ESTABLISHED,RELATED -j ACCEPT
-
-# Persistir reglas iptables para que sobrevivan a reinicios
-DEBIAN_FRONTEND=noninteractive apt-get install -y iptables-persistent > /dev/null 2>&1 || true
-netfilter-persistent save > /dev/null 2>&1 || true
-
-echo -e "${GREEN}[+] NAT habilitado. Los nodos pueden acceder a Internet a través del Jumpstart.${NC}"
-
-# 3. Instalación de dependencias del sistema
-echo -e "${YELLOW}[*] Actualizando repositorios e instalando paquetes necesarios...${NC}"
-apt-get update
-apt-get install -y \
-    tftpd-hpa \
-    isc-dhcp-server \
-    apache2 \
-    syslinux \
-    pxelinux \
-    syslinux-common \
-    wget \
-    python3 \
-    python3-yaml \
-    python3-jinja2 \
-    git
-
-# 4. Configurar el Servidor TFTP
-echo -e "${YELLOW}[*] Configurando servidor TFTP (tftpd-hpa)...${NC}"
-mkdir -p /srv/tftp/pxelinux.cfg
-mkdir -p /srv/tftp/images
-
-# Copiar archivos del bootloader PXE
-cp /usr/lib/PXELINUX/pxelinux.0 /srv/tftp/
-cp /usr/lib/syslinux/modules/bios/*.c32 /srv/tftp/
-
-# Escribir archivo de configuración de TFTP
-cat <<EOF > /etc/default/tftpd-hpa
-TFTP_USERNAME="tftp"
-TFTP_DIRECTORY="/srv/tftp"
-TFTP_ADDRESS=":69"
-TFTP_OPTIONS="--secure"
-EOF
-
-systemctl restart tftpd-hpa
-systemctl enable tftpd-hpa
-echo -e "${GREEN}[+] Servidor TFTP configurado y reiniciado.${NC}"
-
-# 5. Configurar interfaces en el servidor DHCP
-echo -e "${YELLOW}[*] Especificando interfaces para el servidor DHCP...${NC}"
-cat <<EOF > /etc/default/isc-dhcp-server
-# Escuchar en las dos redes internas (main e internal)
-INTERFACESv4="enp0s9 enp0s10"
-INTERFACESv6=""
-EOF
-
-# 6. Preparar directorios de instalación y descargar ISO de Ubuntu 22.04 LTS
-ISO_DIR="/var/www/html/ubuntu-22.04"
-KERNEL_DIR="/srv/tftp/images/ubuntu-22.04"
-
-mkdir -p "$ISO_DIR"
-mkdir -p "$KERNEL_DIR"
-
-ISO_PATH="${ISO_DIR}/ubuntu-22.04.5-live-server-amd64.iso"
-
-if [ ! -f "$ISO_PATH" ]; then
-    echo -e "${YELLOW}[*] Descargando ISO de Ubuntu Server 22.04 LTS (1.4 GB)...${NC}"
-    echo -e "${YELLOW}    Esto puede tardar unos minutos dependiendo de la conexión.${NC}"
-    wget -q --show-progress -O "$ISO_PATH" https://releases.ubuntu.com/22.04/ubuntu-22.04.5-live-server-amd64.iso
-    echo -e "${GREEN}[+] Descarga completada.${NC}"
-else
-    echo -e "${GREEN}[+] ISO de Ubuntu Server 22.04 ya presente. Omitiendo descarga.${NC}"
-fi
-
-# Extraer vmlinuz e initrd de la ISO
-echo -e "${YELLOW}[*] Extrayendo kernel e initrd de la ISO...${NC}"
-MOUNT_DIR="/mnt/ubuntu-iso-temp"
-mkdir -p "$MOUNT_DIR"
-
-mount -o loop,ro "$ISO_PATH" "$MOUNT_DIR"
-cp "${MOUNT_DIR}/casper/vmlinuz" "$KERNEL_DIR/"
-cp "${MOUNT_DIR}/casper/initrd" "$KERNEL_DIR/"
-umount "$MOUNT_DIR"
-rmdir "$MOUNT_DIR"
-echo -e "${GREEN}[+] Kernel e initrd extraídos y ubicados en el servidor TFTP.${NC}"
-
-# 7. Asegurar permisos correctos en directorios compartidos
-chown -R tftp:tftp /srv/tftp
-chmod -R 755 /srv/tftp
-chown -R www-data:www-data /var/www/html
-chmod -R 755 /var/www/html
-
-# 8. Generar las llaves SSH SSH en Jumpstart si no existen
-if [ ! -f /root/.ssh/id_rsa ]; then
-    echo -e "${YELLOW}[*] Generando par de llaves SSH para automatización con Ansible...${NC}"
-    mkdir -p /root/.ssh
-    ssh-keygen -t rsa -b 2048 -f /root/.ssh/id_rsa -N ""
-    echo -e "${GREEN}[+] Llave SSH generada.${NC}"
-fi
-
-# Determinar ruta del repositorio (un nivel arriba del directorio scripts)
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 
-# 9. Ejecutar el Aprovisionador dinámico en Python para generar DHCP, menús PXE y Autoinstalls
-echo -e "${YELLOW}[*] Ejecutando aprovisionador de nodos para generar configuraciones finales...${NC}"
+echo -e "${YELLOW}[*] Lanzando Playbook de aprovisionamiento del Jumpstart...${NC}"
+echo -e "${GREEN}    Ansible se encargará de configurar redes, TFTP, DHCP y descargar ISOs.${NC}"
+echo -e "--------------------------------------------------------------------------------"
 
-# Dar permisos de ejecución al script si no los tiene
-chmod +x "${REPO_DIR}/provisioner.py"
+# Ejecutar el playbook en modo local
+cd "$REPO_DIR"
+ansible-playbook -i localhost, -c local playbooks/jumpstart.yml
 
-# Ejecutar la acción de generación de configuraciones del aprovisionador en caliente
-"${REPO_DIR}/provisioner.py" generate-configs
-
-# 10. Iniciar y habilitar todos los servicios del Jumpstart
-echo -e "${YELLOW}[*] Iniciando y habilitando servicios de red...${NC}"
-systemctl restart isc-dhcp-server || {
-    echo -e "${RED}[-] Advertencia: isc-dhcp-server falló al iniciar. Esto es normal si no hay clientes conectados físicamente aún.${NC}"
-}
-systemctl enable isc-dhcp-server
-
-systemctl restart apache2
-systemctl enable apache2
-
-echo -e "${YELLOW}[*] Instalando servicio de configuración de Ansible (config-manager)...${NC}"
-
-# 10.1 Copiar el archivo de servicio
-CALLBACK_SERVICE_SRC="${REPO_DIR}/services/config-manager.service"
-sed "s|/root/trabajo|${REPO_DIR}|g" "$CALLBACK_SERVICE_SRC" > /etc/systemd/system/config-manager.service
-
-# 10.2 Recargar systemd y habilitar
-systemctl daemon-reload
-systemctl enable config-manager
-systemctl restart config-manager
-echo -e "${GREEN}[+] Servicio config-manager activo en el puerto 8081.${NC}"
-echo -e "    Diagnóstico: curl http://localhost:8081/health"
-
+echo -e "--------------------------------------------------------------------------------"
 echo -e "${GREEN}====================================================${NC}"
 echo -e "${GREEN}===  BOOTSTRAP DEL JUMPSTART COMPLETADO CON ÉXITO ===${NC}"
 echo -e "${GREEN}====================================================${NC}"
@@ -240,7 +56,6 @@ echo -e "${GREEN}  cd /ruta/al/repositorio${NC}"
 echo -e "${GREEN}  ./host_service.sh install    # Para instalar y activar el servicio en segundo plano${NC}"
 echo -e "${GREEN}  ./host_service.sh logs       # Para ver los logs en tiempo real${NC}"
 echo ""
-
 echo -e "${BLUE}Verifica desde el Jumpstart que el servidor responde:${NC}"
 echo -e "${GREEN}  curl http://192.168.56.1:7070/health${NC}"
 echo ""
