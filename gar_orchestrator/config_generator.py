@@ -3,6 +3,12 @@ import subprocess
 import jinja2
 from gar_orchestrator.parsers import load_networks_file
 
+GREEN = '\033[92m'
+YELLOW = '\033[93m'
+CYAN = '\033[96m'
+RED = '\033[91m'
+NC = '\033[0m'
+
 def get_jumpstart_pubkey():
     """Lee la clave pública SSH local del jumpstart. Genera una de prueba si no existe."""
     key_paths = [
@@ -15,9 +21,17 @@ def get_jumpstart_pubkey():
             with open(path, 'r') as f:
                 return f.read().strip()
                 
-    print("[!] No se encontró clave pública SSH local. Usando clave pública por defecto.")
-    return "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC2r... admin@jumpstart"
-
+    print(f"[{YELLOW}!{NC}] No se encontró clave pública SSH local. Generando un nuevo par de claves RSA...")
+    default_key_path = "/root/.ssh/id_rsa" if os.geteuid() == 0 else os.path.expanduser("~/.ssh/id_rsa")
+    os.makedirs(os.path.dirname(default_key_path), exist_ok=True)
+    
+    try:
+        subprocess.run(["ssh-keygen", "-t", "rsa", "-b", "2048", "-f", default_key_path, "-N", ""], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        with open(default_key_path + ".pub", 'r') as f:
+            return f.read().strip()
+    except Exception as e:
+        print(f"[{RED}-{NC}] Error generando la clave SSH: {e}")
+        return ""
 def _setup_target_paths(base_dir):
     """Establece y crea los directorios de destino dependiendo de si es entorno real o local."""
     dhcp_config_path = "/etc/dhcp/dhcpd.conf"
@@ -37,12 +51,6 @@ def _setup_target_paths(base_dir):
     os.makedirs(web_autoinstall_dir, exist_ok=True)
     
     return dhcp_config_path, tftp_pxe_dir, web_autoinstall_dir, is_live_server
-
-GREEN = '\033[92m'
-YELLOW = '\033[93m'
-CYAN = '\033[96m'
-RED = '\033[91m'
-NC = '\033[0m'
 
 def _get_jinja_env(templates_dir):
     """Inicializa y devuelve el entorno de Jinja2."""
