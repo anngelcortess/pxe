@@ -1,0 +1,40 @@
+# dhcpd.conf
+# Generado automáticamente por GAR Orchestrator
+
+# Configuración global
+default-lease-time 600;
+max-lease-time 7200;
+authoritative;
+
+# Opciones PXE
+allow booting;
+allow bootp;
+
+{% for net in networks %}
+# Red: {{ net.name }}
+subnet {{ net.subnet }} netmask {{ net.netmask }} {
+  option subnet-mask {{ net.netmask }};
+  option routers {{ net.gateway }};
+{% if net.dns %}
+  option domain-name-servers {{ net.dns | join(', ') }};
+{% endif %}
+  next-server {{ net.gateway }};
+  filename "pxelinux.0";
+{% if net.dhcp_range %}
+  range {{ net.dhcp_range.start }} {{ net.dhcp_range.end }}; # Rango dinamico
+{% endif %}
+
+{% for node in nodes %}
+{% if node.name != 'jumpstart' and node.mac %}
+{% for node_net in node.networks %}
+{% if node_net.name == net.name and node_net.ip %}
+  host {{ node.name }} {
+    hardware ethernet {{ node.mac | upper }};
+    fixed-address {{ node_net.ip }};
+  }
+{% endif %}
+{% endfor %}
+{% endif %}
+{% endfor %}
+}
+{% endfor %}

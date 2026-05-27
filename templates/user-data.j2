@@ -1,0 +1,59 @@
+#cloud-config
+autoinstall:
+  version: 1
+  locale: es_ES.UTF-8
+  keyboard:
+    layout: es
+  refresh-installer:
+    update: false
+  identity:
+    hostname: {{ node.name }}
+    username: admin
+    password: "$6$CylgQV.8wYk/VUlE$UpXhP0y5NrH3ZypUfNvOF2/JEu5rRedFbseqWxsJ/dN0.XjeiK9ho.e78NWOysq/4o19qn1MolUcccrIyCjj5."
+    realname: Administrator
+  ssh:
+    install-server: true
+    authorized-keys:
+      - "{{ ssh_pub_key }}"
+    allow-pw: true
+  network:
+    version: 2
+    ethernets:
+{% for net in node.networks %}
+{% set nic_name = ['enp0s3', 'enp0s8', 'enp0s9', 'enp0s10'][loop.index0] %}
+      {{ nic_name }}:
+{% if net.type == 'nat' %}
+        dhcp4: true
+{% else %}
+{% set global_net = networks | selectattr("name", "equalto", net.name) | first | default({}) %}
+{% set nm = net.netmask | default(global_net.netmask | default('255.255.255.0')) %}
+{% set gw = net.gateway | default(global_net.gateway | default('')) %}
+{% set dns_list = net.dns | default(global_net.dns | default([])) %}
+{% set cidr = "24" if nm == '255.255.255.0' else "16" %}
+        dhcp4: false
+        addresses:
+          - {{ net.ip }}/{{ cidr }}
+{% if gw %}
+        gateway4: {{ gw }}
+{% endif %}
+{% if dns_list %}
+        nameservers:
+          addresses:
+{% for d in dns_list %}
+            - {{ d }}
+{% endfor %}
+{% endif %}
+{% endif %}
+{% endfor %}
+  storage:
+    layout:
+      name: direct
+  updates: security
+  late-commands:
+    - "curtin in-target systemctl disable apt-daily.timer apt-daily-upgrade.timer"
+    - "curtin in-target systemctl disable unattended-upgrades.service"
+    # Notificar al jumpstart que la instalación ha terminado (anti-loop PXE + lanzar Ansible)
+    - "curl -sf http://{{ jumpstart_ip }}:8081/node-ready?node={{ node.name }} || true"
+    # Forzar apagado limpio en vez del reboot por defecto de Subiquity.
+    # Esto permite a la API del Host cambiar el boot order a disco antes de reencender.
+    - "shutdown -P now"

@@ -40,7 +40,7 @@ Este archivo proporciona contexto crítico, reglas de arquitectura y convencione
 
 * **Python:** 
   * Se requiere Python 3.10+.
-  * **Cero Dependencias Externas** para el orquestador (usamos nuestro propio parser YAML nativo para evitar obligar a instalar `PyYAML`).
+  * **Dependencias Externas:** El orquestador usa `python3-yaml` y `python3-jinja2`. Estas librerías se instalan a nivel de sistema (APT) en el Jumpstart durante el bootstrap, no requieren `pip` ni entornos virtuales.
 * **Bash:** 
   * Usa `set -euo pipefail` en todos los scripts de Bash.
   * Colorea las salidas por consola para mejorar la legibilidad.

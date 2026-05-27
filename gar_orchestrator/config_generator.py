@@ -1,5 +1,6 @@
 import os
 import subprocess
+import jinja2
 from gar_orchestrator.parsers import load_networks_file
 
 def get_jumpstart_pubkey():
@@ -43,83 +44,41 @@ CYAN = '\033[96m'
 RED = '\033[91m'
 NC = '\033[0m'
 
-def _generate_dhcp_config(nodes, networks_list, dhcp_config_path):
+def _get_jinja_env(templates_dir):
+    """Inicializa y devuelve el entorno de Jinja2."""
+    return jinja2.Environment(
+        loader=jinja2.FileSystemLoader(templates_dir),
+        trim_blocks=True,
+        lstrip_blocks=True
+    )
+
+def _generate_dhcp_config(nodes, networks_list, dhcp_config_path, jinja_env):
     """Genera el fichero de configuración de DHCP."""
     print(f"[{CYAN}*{NC}] Generando archivo DHCP global...")
     
-    assets_dir = os.path.join(os.path.dirname(__file__), 'assets')
-    dhcp_header_path = os.path.join(assets_dir, 'dhcp_header.template')
-    if os.path.exists(dhcp_header_path):
-        with open(dhcp_header_path, 'r') as f:
-            dhcp_content = f.read() + "\n"
-    else:
-        dhcp_content = ""
+    try:
+        template = jinja_env.get_template('dhcpd.conf.j2')
+        dhcp_content = template.render(nodes=nodes, networks=networks_list)
+        with open(dhcp_config_path, 'w') as f:
+            f.write(dhcp_content)
+    except Exception as e:
+        print(f"[{RED}-{NC}] Error generando DHCP: {e}")
 
-    for net in networks_list:
-        net_name = net.get('name')
-        subnet = net.get('subnet')
-        netmask = net.get('netmask')
-        gateway = net.get('gateway')
-        dns_servers = net.get('dns', [])
-        dhcp_range = net.get('dhcp_range', {})
-        range_start = dhcp_range.get('start')
-        range_end = dhcp_range.get('end')
-        
-        dns_list_str = ", ".join(dns_servers) if dns_servers else ""
-        
-        dhcp_content += f"""
-# Red: {net_name}
-subnet {subnet} netmask {netmask} {{
-  option subnet-mask {netmask};
-  option routers {gateway};
-"""
-        if dns_list_str:
-            dhcp_content += f"  option domain-name-servers {dns_list_str};\n"
-            
-        dhcp_content += f"""  next-server {gateway};
-  filename "pxelinux.0";
-"""
-        if range_start and range_end:
-            dhcp_content += f"  range {range_start} {range_end}; # Rango dinamico\n"
-            
-        for node in nodes:
-            name = node.get('name')
-            mac = node.get('mac')
-            if name == 'jumpstart' or not mac:
-                continue
-                
-            for node_net in node.get('networks', []):
-                if node_net.get('name') == net_name:
-                    ip = node_net.get('ip')
-                    dhcp_content += f"""
-  host {name} {{
-    hardware ethernet {mac.upper()};
-    fixed-address {ip};
-  }}
-"""
-        dhcp_content += "}\n"
-    
-    with open(dhcp_config_path, 'w') as f:
-        f.write(dhcp_content)
-
-def _generate_pxe_menu(name, mac, jumpstart_ip, tftp_pxe_dir):
+def _generate_pxe_menu(node, jumpstart_ip, tftp_pxe_dir, jinja_env):
     """Genera el archivo de menú PXELINUX específico para la MAC de un nodo."""
+    mac = node.get('mac')
     mac_formatted = "01-" + mac.lower().replace(':', '-')
     pxe_file_path = os.path.join(tftp_pxe_dir, mac_formatted)
     
-    assets_dir = os.path.join(os.path.dirname(__file__), 'assets')
-    pxe_template_path = os.path.join(assets_dir, 'pxe_menu.template')
-    
-    if os.path.exists(pxe_template_path):
-        with open(pxe_template_path, 'r') as f:
-            pxe_menu_content = f.read().format(name=name, jumpstart_ip=jumpstart_ip)
-    else:
-        pxe_menu_content = ""
-        
-    with open(pxe_file_path, 'w') as f:
-        f.write(pxe_menu_content)
+    try:
+        template = jinja_env.get_template('pxe_menu.j2')
+        pxe_menu_content = template.render(node=node, jumpstart_ip=jumpstart_ip)
+        with open(pxe_file_path, 'w') as f:
+            f.write(pxe_menu_content)
+    except Exception as e:
+        print(f"[{RED}-{NC}] Error generando menú PXE para {node.get('name')}: {e}")
 
-def _generate_autoinstall_files(node, jumpstart_ip, ssh_key, templates_dir, web_autoinstall_dir, networks_list):
+def _generate_autoinstall_files(node, jumpstart_ip, ssh_key, templates_dir, web_autoinstall_dir, networks_list, jinja_env):
     """Genera los archivos meta-data y user-data inyectando variables en las plantillas."""
     name = node.get('name')
     
@@ -136,61 +95,20 @@ def _generate_autoinstall_files(node, jumpstart_ip, ssh_key, templates_dir, web_
         with open(meta_data_dst, 'w') as dst:
             dst.write("instance-id: nocloud-vm\n")
             
-    # user-data
-    template_path = os.path.join(templates_dir, "user-data")
-        
-    if os.path.exists(template_path):
-        with open(template_path, 'r') as f:
-            ud_template = f.read()
-    else:
-        ud_template = "#cloud-config\nautoinstall:\n  version: 1\n"
-        
-    # Mapeo de NICs de VirtualBox a nombres de interfaz Linux
-    # --nic1 → enp0s3, --nic2 → enp0s8, --nic3 → enp0s9, --nic4 → enp0s10
-    VBOX_NIC_NAMES = ["enp0s3", "enp0s8", "enp0s9", "enp0s10"]
-    
-    netplan_interface_config = ""
-    for idx, net in enumerate(node.get('networks', [])):
-        if idx >= len(VBOX_NIC_NAMES):
-            break
-        nic_name = VBOX_NIC_NAMES[idx]
-        net_type = net.get('type', 'intnet').lower()
-        
-        if net_type == 'nat':
-            # Interfaz NAT de VirtualBox: usa DHCP (VBox asigna IP automáticamente)
-            netplan_interface_config += f"      {nic_name}:\n        dhcp4: true"
-        else:
-            # Buscar la red global para heredar configuraciones
-            global_net = next((n for n in networks_list if n.get('name') == net.get('name')), {})
-            
-            # Interfaz de red interna: configuración estática
-            ip = net.get('ip', '')
-            # Usar .get() con el valor global como default
-            nm = net.get('netmask', global_net.get('netmask', '255.255.255.0'))
-            gw = net.get('gateway', global_net.get('gateway', ''))
-            dns_list = net.get('dns', global_net.get('dns', []))
-            
-            cidr = "24" if nm == '255.255.255.0' else "16"
-            
-            netplan_interface_config += f"      {nic_name}:\n        dhcp4: false\n        addresses:\n          - {ip}/{cidr}"
-            if gw:
-                netplan_interface_config += f"\n        gateway4: {gw}"
-            if dns_list:
-                dns_entries = "\n".join([f"            - {d}" for d in dns_list])
-                netplan_interface_config += f"\n        nameservers:\n          addresses:\n{dns_entries}"
-        
-        # Separador entre interfaces
-        if idx < len(node.get('networks', [])) - 1:
-            netplan_interface_config += "\n"
-
-    user_data_content = ud_template.replace("{{ HOSTNAME }}", name)
-    user_data_content = user_data_content.replace("{{ SSH_PUB_KEY }}", ssh_key)
-    user_data_content = user_data_content.replace("{{ INTERFACES_CONFIG }}", netplan_interface_config)
-    user_data_content = user_data_content.replace("{{ JUMPSTART_IP }}", jumpstart_ip)
-    
-    user_data_dst = os.path.join(node_install_dir, "user-data")
-    with open(user_data_dst, 'w') as f:
-        f.write(user_data_content)
+    # user-data (Jinja2)
+    try:
+        template = jinja_env.get_template('user-data.j2')
+        user_data_content = template.render(
+            node=node,
+            networks=networks_list,
+            ssh_pub_key=ssh_key,
+            jumpstart_ip=jumpstart_ip
+        )
+        user_data_dst = os.path.join(node_install_dir, "user-data")
+        with open(user_data_dst, 'w') as f:
+            f.write(user_data_content)
+    except Exception as e:
+        print(f"[{RED}-{NC}] Error generando user-data para {name}: {e}")
 
 def generate_pxe_configs(nodes, templates_dir=None):
     """Punto de entrada principal. Coordina la generación de todas las configuraciones."""
@@ -204,9 +122,12 @@ def generate_pxe_configs(nodes, templates_dir=None):
     
     dhcp_config_path, tftp_pxe_dir, web_autoinstall_dir, is_live_server = _setup_target_paths(base_dir)
     
+    # Configurar entorno Jinja2
+    jinja_env = _get_jinja_env(templates_dir)
+    
     # 1. Generar DHCP global
-    _generate_dhcp_config(nodes, networks_list, dhcp_config_path)
-
+    _generate_dhcp_config(nodes, networks_list, dhcp_config_path, jinja_env)
+    
     # 2. Generar ficheros por nodo
     processed_nodes = 0
     for node in nodes:
@@ -224,8 +145,8 @@ def generate_pxe_configs(nodes, templates_dir=None):
             print(f"[{RED}-{NC}] Error: No se pudo determinar la IP del jumpstart para la red {primary_net_name}.")
             continue
             
-        _generate_pxe_menu(name, mac, jumpstart_ip, tftp_pxe_dir)
-        _generate_autoinstall_files(node, jumpstart_ip, ssh_key, templates_dir, web_autoinstall_dir, networks_list)
+        _generate_pxe_menu(node, jumpstart_ip, tftp_pxe_dir, jinja_env)
+        _generate_autoinstall_files(node, jumpstart_ip, ssh_key, templates_dir, web_autoinstall_dir, networks_list, jinja_env)
         processed_nodes += 1
         
     if processed_nodes > 0:

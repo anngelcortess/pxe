@@ -110,6 +110,7 @@ apt-get install -y \
     wget \
     python3 \
     python3-yaml \
+    python3-jinja2 \
     git
 
 # 4. Configurar el Servidor TFTP
