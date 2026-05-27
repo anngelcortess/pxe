@@ -88,8 +88,7 @@
     - name: "NAT: Permitir tráfico establecido/relacionado"
       iptables:
         chain: FORWARD
-        match: state
-        state: ESTABLISHED,RELATED
+        ctstate: ESTABLISHED,RELATED
         jump: ACCEPT
 
     - name: "NAT: Guardar reglas de iptables"
