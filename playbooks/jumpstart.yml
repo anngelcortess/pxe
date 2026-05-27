@@ -42,13 +42,13 @@
                       dhcp4: false
                       addresses:
                           - 192.168.56.10/24
-                  {% for net in networks %}
-                  {% set nic_name = ['enp0s9', 'enp0s10', 'enp0s16', 'enp0s17'][loop.index0] %}
+          {% for net in networks %}
+          {% set nic_name = ['enp0s9', 'enp0s10', 'enp0s16', 'enp0s17'][loop.index0] %}
                   {{ nic_name }}:
                       dhcp4: false
                       addresses:
                           - {{ net.gateway }}/24
-                  {% endfor %}
+          {% endfor %}
       notify: Aplicar Netplan
 
     - name: "NAT: Habilitar IP Forwarding"
