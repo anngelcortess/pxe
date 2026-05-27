@@ -45,7 +45,7 @@ Este archivo proporciona contexto crítico, reglas de arquitectura y convencione
   * Usa `set -euo pipefail` en todos los scripts de Bash.
   * Colorea las salidas por consola para mejorar la legibilidad.
 * **Ansible (Fase 2):** 
-  * Las contraseñas de las VMs instaladas son `gar1234`. El usuario es `admin`.
+  * Las contraseñas de las VMs instaladas son `admin`. El usuario es `admin`.
   * Sin embargo, **NO se debe usar contraseña por SSH**. El Jumpstart inyecta su clave pública en todos los nodos durante el Autoinstall. Ansible debe autenticarse por llaves.
 
 ---
