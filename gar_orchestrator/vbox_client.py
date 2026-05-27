@@ -167,27 +167,46 @@ def finalize_node(name, nodes, host_api_url, tftp_pxe_dir=None, templates_dir=No
 
 def deploy_virtualbox_vms(nodes, host_api_url, vm_dir=None):
     """Hace una petición a la API del Host para desplegar las VMs."""
-    print("[*] Iniciando despliegue (deploy) de la maqueta a través de la API del Host...")
+    vms_to_process = [n for n in nodes if n.get('name') != 'jumpstart']
+    print(f"[{CYAN}*{NC}] Iniciando despliegue masivo (deploy) de {len(vms_to_process)} VMs a través de la API del Host...")
     
-    print(f"[*] Enviando especificaciones de {len(nodes)} nodos a la API del Host...")
-    result = _make_api_request(host_api_url, "/vbox/deploy", {"nodes": nodes})
+    # Transformando ("masticando") la configuración de los YAMLs
+    payload_vms = []
+    for node in vms_to_process:
+        specs = node.get("vbox_specs", {})
+        payload_vms.append({
+            "name": node.get("name"),
+            "ostype": "Ubuntu_64",
+            "cpus": specs.get("cpus", 1),
+            "ram_mb": specs.get("ram_mb", 1024),
+            "disk_gb": specs.get("disk_gb", 20),
+            "vram": 16,
+            "graphicscontroller": "vmsvga",
+            "networks": node.get("networks", [])
+        })
+
+    result = _make_api_request(host_api_url, "/vbox/create-vms", {"vms": payload_vms})
     
-    if result:
-        print(f"[+] Éxito: {result.get('message', 'Despliegue completado')}")
+    if result and result.get("status") == "ok":
+        print(f"[{GREEN}✓{NC}] {result.get('message', 'Despliegue completado')}")
         for msg in result.get('details', []):
             print(f"    - {msg}")
+    else:
+        print(f"[{RED}!{NC}] Fallo en el despliegue.")
 
 def undeploy_virtualbox_vms(nodes, host_api_url):
     """Hace una petición a la API del Host para eliminar todas las VMs."""
-    print("[*] Iniciando desinstalación (undeploy) de la maqueta a través de la API del Host...")
+    vms_to_process = [{"name": n.get('name')} for n in nodes if n.get('name') != 'jumpstart']
+    print(f"[{CYAN}*{NC}] Enviando petición de borrado masivo de {len(vms_to_process)} VMs a la API del Host...")
     
-    print(f"[*] Enviando petición de borrado a la API del Host...")
-    result = _make_api_request(host_api_url, "/vbox/undeploy", {"nodes": nodes})
+    result = _make_api_request(host_api_url, "/vbox/delete-vms", {"vms": vms_to_process})
     
-    if result:
-        print(f"[+] Éxito: {result.get('message', 'Desinstalación completada')}")
+    if result and result.get("status") == "ok":
+        print(f"[{GREEN}✓{NC}] {result.get('message', 'Desinstalación completada')}")
         for msg in result.get('details', []):
             print(f"    - {msg}")
+    else:
+        print(f"[{RED}!{NC}] Fallo en la desinstalación.")
 
 def start_virtualbox_vms(nodes, host_api_url, vm_type="headless"):
     """Inicia las VMs a través de la API del Host."""

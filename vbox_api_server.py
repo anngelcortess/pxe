@@ -262,12 +262,12 @@ class VBoxAPIHandler(http.server.BaseHTTPRequestHandler):
             else:
                 self._handle_vbox_error(out)
 
-        # POST /vbox/deploy
-        # Body: {"nodes": [...]}
-        elif path == "/vbox/deploy":
-            nodes = body.get("nodes", [])
-            if not isinstance(nodes, list):
-                self._error(400, '"nodes" debe ser una lista')
+        # POST /vbox/create-vms
+        # Body: {"vms": [...]}
+        elif path == "/vbox/create-vms":
+            vms = body.get("vms", [])
+            if not isinstance(vms, list):
+                self._error(400, '"vms" debe ser una lista')
                 return
 
             vm_dir = os.path.expanduser("~/VirtualBox VMs")
@@ -276,9 +276,9 @@ class VBoxAPIHandler(http.server.BaseHTTPRequestHandler):
             existing_vms = parse_vms_output(out) if ok else []
 
             log_msgs = []
-            for node in nodes:
-                name = node.get("name")
-                if not name or name == "jumpstart":
+            for vm in vms:
+                name = vm.get("name")
+                if not name:
                     continue
                 
                 if name in existing_vms:
@@ -286,13 +286,15 @@ class VBoxAPIHandler(http.server.BaseHTTPRequestHandler):
                     vbox("unregistervm", sanitize_vm_name(name), "--delete")
                     log_msgs.append(f"Eliminada VM previa '{name}'")
                 
-                specs = node.get("vbox_specs", {})
-                cpus = str(specs.get("cpus", 1))
-                ram = str(specs.get("ram_mb", 1024))
-                disk_gb = specs.get("disk_gb", 20)
+                cpus = str(vm.get("cpus", 1))
+                ram = str(vm.get("ram_mb", 1024))
+                disk_gb = vm.get("disk_gb", 20)
+                ostype = vm.get("ostype", "Ubuntu_64")
+                vram = str(vm.get("vram", 16))
+                graphicscontroller = vm.get("graphicscontroller", "vmsvga")
                 
                 # 1. Crear VM
-                ok, err = vbox("createvm", "--name", sanitize_vm_name(name), "--ostype", "Ubuntu_64", "--register")
+                ok, err = vbox("createvm", "--name", sanitize_vm_name(name), "--ostype", ostype, "--register")
                 if not ok:
                     self._error(500, f"Error creando VM {name}: {err}")
                     return
@@ -306,17 +308,17 @@ class VBoxAPIHandler(http.server.BaseHTTPRequestHandler):
                     "--boot2", "disk",
                     "--boot3", "none",
                     "--boot4", "none",
-                    "--vram", "16",
-                    "--graphicscontroller", "vmsvga"
+                    "--vram", vram,
+                    "--graphicscontroller", graphicscontroller
                 ]
-                networks = node.get("networks", [])
+                networks = vm.get("networks", [])
                 for idx, net in enumerate(networks, start=1):
                     net_type = net.get("type", "intnet")
                     cmd_modify += [f"--nic{idx}", net_type]
                     if net_type == "intnet":
-                        cmd_modify += [f"--intnet{idx}", net.get("name")]
-                    if idx == 1 and node.get("mac"):
-                        mac_clean = node.get("mac").replace(":", "").replace("-", "").upper()
+                        cmd_modify += [f"--intnet{idx}", net.get("name", "")]
+                    if net.get("mac"):
+                        mac_clean = net.get("mac").replace(":", "").replace("-", "").upper()
                         cmd_modify += [f"--macaddress{idx}", mac_clean]
                 
                 vbox(*cmd_modify)
@@ -334,23 +336,23 @@ class VBoxAPIHandler(http.server.BaseHTTPRequestHandler):
                 vbox("startvm", sanitize_vm_name(name), "--type", "headless")
                 log_msgs.append(f"Desplegada y encendida VM '{name}'")
 
-            self._ok(message="Despliegue completado", details=log_msgs)
+            self._ok(message="Creación masiva completada", details=log_msgs)
 
-        # POST /vbox/undeploy
-        # Body: {"nodes": [...]}
-        elif path == "/vbox/undeploy":
-            nodes = body.get("nodes", [])
-            if not isinstance(nodes, list):
-                self._error(400, '"nodes" debe ser una lista')
+        # POST /vbox/delete-vms
+        # Body: {"vms": [{"name": "..."}]}
+        elif path == "/vbox/delete-vms":
+            vms = body.get("vms", [])
+            if not isinstance(vms, list):
+                self._error(400, '"vms" debe ser una lista')
                 return
 
             ok, out = vbox("list", "vms")
             existing_vms = parse_vms_output(out) if ok else []
 
             log_msgs = []
-            for node in nodes:
-                name = node.get("name")
-                if not name or name == "jumpstart":
+            for vm in vms:
+                name = vm.get("name")
+                if not name:
                     continue
                 
                 if name in existing_vms:
@@ -358,7 +360,7 @@ class VBoxAPIHandler(http.server.BaseHTTPRequestHandler):
                     if vbox("unregistervm", sanitize_vm_name(name), "--delete")[0]:
                         log_msgs.append(f"VM '{name}' eliminada")
             
-            self._ok(message="Desinstalación completada", details=log_msgs)
+            self._ok(message="Borrado masivo completado", details=log_msgs)
 
         else:
             self._error(404, f"Endpoint no encontrado: {path}")
