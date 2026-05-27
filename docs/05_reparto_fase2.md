@@ -4,6 +4,14 @@
 **Herramienta Base:** Ansible (Todos crearán roles y playbooks para su parte).
 **Nodos Totales:** 17
 
+**Tecnologías a usar:**
+- Ansible
+- Docker Swarm
+- Nginx
+- CheckMK + SNMP
+- UFW
+- GlusterFS
+
 La estrategia es que cada miembro asuma un "Rol" como especialista de una pieza clave de la infraestructura. De esta forma, cada uno puede programar su parte en Ansible casi de forma independiente, uniéndolo todo al final en un `site.yml`.
 
 ---
