@@ -1,7 +1,7 @@
 import os
 import subprocess
 import jinja2
-from gar_orchestrator.parsers import load_networks_file
+from gar_orchestrator.parsers import load_networks_file, load_settings_file
 
 GREEN = '\033[92m'
 YELLOW = '\033[93m'
@@ -9,11 +9,11 @@ CYAN = '\033[96m'
 RED = '\033[91m'
 NC = '\033[0m'
 
-def get_jumpstart_pubkey():
+def get_jumpstart_pubkey(ssh_user='admin'):
     """Lee la clave pública SSH local del jumpstart. Genera una de prueba si no existe."""
     key_paths = [
         "/root/.ssh/id_rsa.pub",
-        "/home/admin/.ssh/id_rsa.pub",
+        f"/home/{ssh_user}/.ssh/id_rsa.pub",
         os.path.expanduser("~/.ssh/id_rsa.pub")
     ]
     for path in key_paths:
@@ -86,7 +86,7 @@ def _generate_pxe_menu(node, jumpstart_ip, tftp_pxe_dir, jinja_env):
     except Exception as e:
         print(f"[{RED}-{NC}] Error generando menú PXE para {node.get('name')}: {e}")
 
-def _generate_autoinstall_files(node, jumpstart_ip, ssh_key, templates_dir, web_autoinstall_dir, networks_list, jinja_env):
+def _generate_autoinstall_files(node, jumpstart_ip, ssh_key, templates_dir, web_autoinstall_dir, networks_list, jinja_env, settings):
     """Genera los archivos meta-data y user-data inyectando variables en las plantillas."""
     name = node.get('name')
     
@@ -103,6 +103,26 @@ def _generate_autoinstall_files(node, jumpstart_ip, ssh_key, templates_dir, web_
         with open(meta_data_dst, 'w') as dst:
             dst.write("instance-id: nocloud-vm\n")
             
+    # Configuración de usuario y password
+    auth_config = node.get('auth', {})
+    defaults = settings.get('defaults', {})
+    
+    vm_user = auth_config.get('username', defaults.get('vm_user', 'admin'))
+    vm_password_raw = auth_config.get('password', defaults.get('vm_password', 'secreto'))
+    
+    if not vm_password_raw.startswith('$6$'):
+        # Usamos openssl para generar el hash de forma compatible y evitar la librería crypt que es obsoleta en Python 3.13
+        try:
+            result = subprocess.run(["openssl", "passwd", "-6", vm_password_raw], capture_output=True, text=True, check=True)
+            vm_password_hash = result.stdout.strip()
+        except Exception as e:
+            print(f"[{RED}-{NC}] Advertencia: no se pudo hashear la contraseña con openssl: {e}")
+            vm_password_hash = vm_password_raw
+    else:
+        vm_password_hash = vm_password_raw
+        
+    callback_port = settings.get('jumpstart', {}).get('callback_port', 8081)
+
     # user-data (Jinja2)
     try:
         template = jinja_env.get_template('user-data.j2')
@@ -110,7 +130,10 @@ def _generate_autoinstall_files(node, jumpstart_ip, ssh_key, templates_dir, web_
             node=node,
             networks=networks_list,
             ssh_pub_key=ssh_key,
-            jumpstart_ip=jumpstart_ip
+            jumpstart_ip=jumpstart_ip,
+            vm_user=vm_user,
+            vm_password_hash=vm_password_hash,
+            callback_port=callback_port
         )
         user_data_dst = os.path.join(node_install_dir, "user-data")
         with open(user_data_dst, 'w') as f:
@@ -125,7 +148,11 @@ def generate_pxe_configs(nodes, templates_dir=None):
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     if templates_dir is None:
         templates_dir = os.path.join(base_dir, "templates")
-    ssh_key = get_jumpstart_pubkey()
+        
+    settings = load_settings_file(os.path.join(base_dir, "config", "settings.yml"))
+    jumpstart_user = settings.get('jumpstart', {}).get('ssh_user', 'admin')
+    
+    ssh_key = get_jumpstart_pubkey(jumpstart_user)
     networks_list = load_networks_file(os.path.join(base_dir, "config", "networks.yml"))
     
     dhcp_config_path, tftp_pxe_dir, web_autoinstall_dir, is_live_server = _setup_target_paths(base_dir)
@@ -154,7 +181,7 @@ def generate_pxe_configs(nodes, templates_dir=None):
             continue
             
         _generate_pxe_menu(node, jumpstart_ip, tftp_pxe_dir, jinja_env)
-        _generate_autoinstall_files(node, jumpstart_ip, ssh_key, templates_dir, web_autoinstall_dir, networks_list, jinja_env)
+        _generate_autoinstall_files(node, jumpstart_ip, ssh_key, templates_dir, web_autoinstall_dir, networks_list, jinja_env, settings)
         processed_nodes += 1
         
     if processed_nodes > 0:

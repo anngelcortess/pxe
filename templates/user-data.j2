@@ -8,8 +8,8 @@ autoinstall:
     update: false
   identity:
     hostname: {{ node.name }}
-    username: admin
-    password: "$6$CylgQV.8wYk/VUlE$UpXhP0y5NrH3ZypUfNvOF2/JEu5rRedFbseqWxsJ/dN0.XjeiK9ho.e78NWOysq/4o19qn1MolUcccrIyCjj5."
+    username: {{ vm_user }}
+    password: "{{ vm_password_hash }}"
     realname: Administrator
   ssh:
     install-server: true
@@ -53,7 +53,7 @@ autoinstall:
     - "curtin in-target systemctl disable apt-daily.timer apt-daily-upgrade.timer"
     - "curtin in-target systemctl disable unattended-upgrades.service"
     # Notificar al jumpstart que la instalación ha terminado (anti-loop PXE + lanzar Ansible)
-    - "curl -sf http://{{ jumpstart_ip }}:8081/node-ready?node={{ node.name }} || true"
+    - "curl -sf http://{{ jumpstart_ip }}:{{ callback_port }}/node-ready?node={{ node.name }} || true"
     # Forzar apagado limpio en vez del reboot por defecto de Subiquity.
     # Esto permite a la API del Host cambiar el boot order a disco antes de reencender.
     - "shutdown -P now"

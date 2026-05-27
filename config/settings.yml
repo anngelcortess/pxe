@@ -1,0 +1,14 @@
+# Configuración Global del Orquestador GAR
+
+host_api:
+  ip: "192.168.56.1"
+  port: 7070
+
+jumpstart:
+  callback_port: 8081
+  ssh_user: "admin"
+
+defaults:
+  vm_user: "admin"
+  # Puedes poner contraseñas en texto plano ("secreto") o hasheadas ("$6$...")
+  vm_password: "$6$CylgQV.8wYk/VUlE$UpXhP0y5NrH3ZypUfNvOF2/JEu5rRedFbseqWxsJ/dN0.XjeiK9ho.e78NWOysq/4o19qn1MolUcccrIyCjj5."

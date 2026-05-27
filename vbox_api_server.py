@@ -30,10 +30,14 @@ from urllib.parse import urlparse, parse_qs
 import threading
 import time
 
+from gar_orchestrator.parsers import load_settings_file
+
 # ── Configuración por defecto ──────────────────────────────────────────────────
-DEFAULT_PORT = 7070
-DEFAULT_BIND = "0.0.0.0"   # Escucha en todas las interfaces. Para mayor seguridad,
-                            # limitar a "192.168.56.1" (solo red Host-Only de VirtualBox).
+base_dir = os.path.dirname(os.path.abspath(__file__))
+settings = load_settings_file(os.path.join(base_dir, "config", "settings.yml"))
+
+DEFAULT_PORT = settings.get('host_api', {}).get('port', 7070)
+DEFAULT_BIND = settings.get('host_api', {}).get('ip', '0.0.0.0')
 
 # ── Logging ────────────────────────────────────────────────────────────────────
 logging.basicConfig(

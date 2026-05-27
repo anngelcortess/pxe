@@ -4,7 +4,7 @@ import sys
 import argparse
 import urllib.request
 
-from gar_orchestrator.parsers import load_all_nodes
+from gar_orchestrator.parsers import load_all_nodes, load_settings_file
 from gar_orchestrator.validators import validate_nodes
 from gar_orchestrator.baremetal import deploy_virtualbox_vms, undeploy_virtualbox_vms, start_virtualbox_vms, stop_virtualbox_vms, get_existing_vms
 from gar_orchestrator.provisioning import run_callback_server, provision_nodes
@@ -26,7 +26,7 @@ def _check_service(url, timeout=5):
     except Exception:
         return False
 
-def preflight_checks(host_api_url, need_vbox=False, need_callback=False):
+def preflight_checks(host_api_url, settings, need_vbox=False, need_callback=False):
     """Verifica que los servicios necesarios estén activos antes de proceder."""
     errors = []
 
@@ -42,7 +42,8 @@ def preflight_checks(host_api_url, need_vbox=False, need_callback=False):
             print(f"[{GREEN}✓{NC}] vbox-api (Host) — OK")
 
     if need_callback:
-        cb_url = "http://localhost:8081/health"
+        callback_port = settings.get('jumpstart', {}).get('callback_port', 8081)
+        cb_url = f"http://localhost:{callback_port}/health"
         if not _check_service(cb_url):
             errors.append(
                 f"  {RED}✗{NC} config-manager (Jumpstart)\n"
@@ -95,7 +96,7 @@ def main():
 
     # Subcomando: listen-callbacks
     parser_listen = subparsers.add_parser('listen-callbacks', parents=[parent_parser], help="Inicia el servidor demonio para escuchar peticiones de finalización PXE")
-    parser_listen.add_argument('--port', type=int, default=8081, help="Puerto de escucha (defecto: 8081)")
+    parser_listen.add_argument('--port', type=int, default=None, help="Puerto de escucha (defecto: valor en settings.yml)")
 
     # Subcomando: start
     parser_start = subparsers.add_parser('start', parents=[parent_parser], help="Iniciar las VMs en VirtualBox (excepto jumpstart)")
@@ -113,10 +114,12 @@ def main():
     if not nodes:
         print("[-] Error: No se encontraron definiciones de nodos YAML.")
         sys.exit(1)
-        
-    jumpstart_node = next((n for n in nodes if n.get('name') == 'jumpstart'), {})
-    host_api_url = jumpstart_node.get('host_api_url', '').strip().rstrip('/')
-        
+    settings_path = os.path.join(script_dir, "config", "settings.yml")
+    settings = load_settings_file(settings_path)
+    
+    host_api_ip = settings.get('host_api', {}).get('ip', '192.168.56.1')
+    host_api_port = settings.get('host_api', {}).get('port', 7070)
+    host_api_url = f"http://{host_api_ip}:{host_api_port}"
     if args.action == 'validate':
         success = validate_nodes(nodes)
         sys.exit(0 if success else 1)
@@ -125,7 +128,7 @@ def main():
         if not validate_nodes(nodes):
             print("[-] Error de validación en los YAML. Abortando despliegue de VMs.")
             sys.exit(1)
-        preflight_checks(host_api_url, need_vbox=True, need_callback=True)
+        preflight_checks(host_api_url, settings, need_vbox=True, need_callback=True)
             
         # Comprobar si ya hay VMs desplegadas de la maqueta
         target_names = [n.get('name') for n in nodes if n.get('name') != 'jumpstart' and n.get('mac')]
@@ -157,7 +160,7 @@ def main():
         if not validate_nodes(nodes):
             print("[-] Error de validación en los YAML. Abortando desinstalación.")
             sys.exit(1)
-        preflight_checks(host_api_url, need_vbox=True)
+        preflight_checks(host_api_url, settings, need_vbox=True)
             
         undeploy_nodes = nodes
         if args.node:
@@ -175,7 +178,7 @@ def main():
         generate_pxe_configs(nodes, args.templates_dir)
 
     elif args.action == 'start':
-        preflight_checks(host_api_url, need_vbox=True)
+        preflight_checks(host_api_url, settings, need_vbox=True)
         start_nodes = nodes
         if args.node:
             start_nodes = [n for n in nodes if n.get('name') == args.node]
@@ -185,7 +188,7 @@ def main():
         start_virtualbox_vms(start_nodes, host_api_url, args.type)
 
     elif args.action == 'stop':
-        preflight_checks(host_api_url, need_vbox=True)
+        preflight_checks(host_api_url, settings, need_vbox=True)
         stop_nodes = nodes
         if args.node:
             stop_nodes = [n for n in nodes if n.get('name') == args.node]
@@ -201,7 +204,8 @@ def main():
 
     elif args.action == 'listen-callbacks':
         # Bloquea el hilo principal atendiendo peticiones HTTP
-        run_callback_server(nodes, host_api_url, port=args.port)
+        port = args.port if args.port else settings.get('jumpstart', {}).get('callback_port', 8081)
+        run_callback_server(nodes, host_api_url, port=port)
 
 if __name__ == '__main__':
     main()

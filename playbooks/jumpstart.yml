@@ -7,6 +7,9 @@
     repo_dir: "{{ lookup('env', 'PWD') }}"
     iso_url: "https://releases.ubuntu.com/22.04/ubuntu-22.04.5-live-server-amd64.iso"
     iso_path: "/var/www/html/ubuntu-22.04/ubuntu-22.04.5-live-server-amd64.iso"
+  vars_files:
+    - "../config/networks.yml"
+    - "../config/settings.yml"
 
   tasks:
     - name: "RED: Desactivar configuración de cloud-init"
@@ -26,7 +29,7 @@
         path: /etc/netplan/50-cloud-init.yaml
         state: absent
 
-    - name: "RED: Generar Netplan de las 4 interfaces"
+    - name: "RED: Generar Netplan de las interfaces"
       copy:
         dest: /etc/netplan/99-manual-networks.yaml
         content: |
@@ -39,14 +42,13 @@
                       dhcp4: false
                       addresses:
                           - 192.168.56.10/24
-                  enp0s9:
+{% for net in networks %}
+{% set nic_name = ['enp0s9', 'enp0s10', 'enp0s16', 'enp0s17'][loop.index0] %}
+                  {{ nic_name }}:
                       dhcp4: false
                       addresses:
-                          - 192.168.1.254/24
-                  enp0s10:
-                      dhcp4: false
-                      addresses:
-                          - 192.168.2.254/24
+                          - {{ net.gateway }}/24
+{% endfor %}
       notify: Aplicar Netplan
 
     - name: "NAT: Habilitar IP Forwarding"
@@ -72,20 +74,15 @@
         jump: MASQUERADE
       notify: Guardar reglas de iptables
 
-    - name: "NAT: Permitir Forwarding desde red Main (enp0s9)"
+    - name: "NAT: Permitir Forwarding desde redes internas"
       iptables:
         chain: FORWARD
-        in_interface: enp0s9
+        in_interface: "{{ ['enp0s9', 'enp0s10', 'enp0s16', 'enp0s17'][ansible_loop.index0] }}"
         out_interface: enp0s3
         jump: ACCEPT
-      notify: Guardar reglas de iptables
-
-    - name: "NAT: Permitir Forwarding desde red Internal (enp0s10)"
-      iptables:
-        chain: FORWARD
-        in_interface: enp0s10
-        out_interface: enp0s3
-        jump: ACCEPT
+      loop: "{{ networks }}"
+      loop_control:
+        extended: yes
       notify: Guardar reglas de iptables
 
     - name: "NAT: Permitir tráfico establecido/relacionado"
@@ -148,7 +145,7 @@
       copy:
         dest: /etc/default/isc-dhcp-server
         content: |
-          INTERFACESv4="enp0s9 enp0s10"
+          INTERFACESv4="{% for net in networks %}{{ ['enp0s9', 'enp0s10', 'enp0s16', 'enp0s17'][loop.index0] }} {% endfor %}"
           INTERFACESv6=""
       notify: Reiniciar DHCP
 

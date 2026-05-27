@@ -134,3 +134,19 @@ def load_networks_file(filepath):
         print(f"[-] Advertencia al parsear redes en {filepath}: {e}.")
     
     return []
+
+def load_settings_file(filepath):
+    """Carga la configuración global desde settings.yml."""
+    if not os.path.exists(filepath):
+        print(f"[-] Advertencia: No se encontró {filepath}. Se usarán valores por defecto locales.")
+        return {}
+    try:
+        if yaml:
+            with open(filepath, 'r') as f:
+                return yaml.safe_load(f)
+        else:
+            print("[-] Advertencia: PyYAML no instalado, no se puede parsear settings.yml complejo.")
+            return {}
+    except Exception as e:
+        print(f"[-] Error al parsear settings en {filepath}: {e}.")
+        return {}
