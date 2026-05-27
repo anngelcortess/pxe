@@ -9,6 +9,12 @@ from gar_orchestrator.validators import validate_nodes
 from gar_orchestrator.vbox_client import deploy_virtualbox_vms, undeploy_virtualbox_vms, finalize_node, start_virtualbox_vms, stop_virtualbox_vms, get_existing_vms
 from gar_orchestrator.config_generator import generate_pxe_configs
 
+GREEN = '\033[92m'
+YELLOW = '\033[93m'
+CYAN = '\033[96m'
+RED = '\033[91m'
+NC = '\033[0m'
+
 # ── Preflight checks ──────────────────────────────────────────────────────────
 
 def _check_service(url, timeout=5):
@@ -27,26 +33,26 @@ def preflight_checks(host_api_url, need_vbox=False, need_callback=False):
         vbox_url = f"{host_api_url}/health"
         if not _check_service(vbox_url):
             errors.append(
-                f"  ✗ vbox-api (Host)\n"
+                f"  {RED}✗{NC} vbox-api (Host)\n"
                 f"    No responde en: {vbox_url}\n"
                 f"    → Arranca el servicio en el Host: ./host_service.sh start"
             )
         else:
-            print("[✓] vbox-api (Host) — OK")
+            print(f"[{GREEN}✓{NC}] vbox-api (Host) — OK")
 
     if need_callback:
         cb_url = "http://localhost:8081/health"
         if not _check_service(cb_url):
             errors.append(
-                f"  ✗ provision-callback (Jumpstart)\n"
+                f"  {RED}✗{NC} provision-callback (Jumpstart)\n"
                 f"    No responde en: {cb_url}\n"
                 f"    → Arranca el servicio: systemctl start provision-callback"
             )
         else:
-            print("[✓] provision-callback (Jumpstart) — OK")
+            print(f"[{GREEN}✓{NC}] provision-callback (Jumpstart) — OK")
 
     if errors:
-        print("\n[-] Preflight check fallido. Servicios no disponibles:\n")
+        print(f"\n[{RED}-{NC}] Preflight check fallido. Servicios no disponibles:\n")
         for e in errors:
             print(e)
         print()
@@ -122,11 +128,11 @@ def main():
         conflicting = [name for name in target_names if name in existing]
         
         if conflicting:
-            print(f"\n[!] Ya existen VMs de un despliegue anterior: {', '.join(conflicting)}")
-            print("    Continuar las ELIMINARÁ y creará de nuevo desde cero.")
+            print(f"\n[{YELLOW}!{NC}] Ya existen VMs de un despliegue anterior: {', '.join(conflicting)}")
+            print(f"    {YELLOW}Continuar las ELIMINARÁ y creará de nuevo desde cero.{NC}")
             confirm = input("\n    ¿Deseas continuar? (s/N): ").strip().lower()
             if confirm not in ('s', 'si', 'sí', 'y', 'yes'):
-                print("[-] Despliegue cancelado por el usuario.")
+                print(f"[{YELLOW}-{NC}] Despliegue cancelado por el usuario.")
                 sys.exit(0)
             print()
 

@@ -37,9 +37,15 @@ def _setup_target_paths(base_dir):
     
     return dhcp_config_path, tftp_pxe_dir, web_autoinstall_dir, is_live_server
 
+GREEN = '\033[92m'
+YELLOW = '\033[93m'
+CYAN = '\033[96m'
+RED = '\033[91m'
+NC = '\033[0m'
+
 def _generate_dhcp_config(nodes, networks_list, dhcp_config_path):
     """Genera el fichero de configuración de DHCP."""
-    print(f"[*] Generando archivo DHCP: {dhcp_config_path}")
+    print(f"[{CYAN}*{NC}] Generando archivo DHCP global...")
     
     assets_dir = os.path.join(os.path.dirname(__file__), 'assets')
     dhcp_header_path = os.path.join(assets_dir, 'dhcp_header.template')
@@ -112,7 +118,6 @@ def _generate_pxe_menu(name, mac, jumpstart_ip, tftp_pxe_dir):
         
     with open(pxe_file_path, 'w') as f:
         f.write(pxe_menu_content)
-    print(f"[+] Menú PXE generado para {name} -> {pxe_file_path}")
 
 def _generate_autoinstall_files(node, jumpstart_ip, ssh_key, templates_dir, web_autoinstall_dir, networks_list):
     """Genera los archivos meta-data y user-data inyectando variables en las plantillas."""
@@ -186,7 +191,6 @@ def _generate_autoinstall_files(node, jumpstart_ip, ssh_key, templates_dir, web_
     user_data_dst = os.path.join(node_install_dir, "user-data")
     with open(user_data_dst, 'w') as f:
         f.write(user_data_content)
-    print(f"[+] Autoinstall user-data generado para {name} -> {user_data_dst}")
 
 def generate_pxe_configs(nodes, templates_dir=None):
     """Punto de entrada principal. Coordina la generación de todas las configuraciones."""
@@ -204,6 +208,7 @@ def generate_pxe_configs(nodes, templates_dir=None):
     _generate_dhcp_config(nodes, networks_list, dhcp_config_path)
 
     # 2. Generar ficheros por nodo
+    processed_nodes = 0
     for node in nodes:
         name = node.get('name')
         mac = node.get('mac')
@@ -216,18 +221,22 @@ def generate_pxe_configs(nodes, templates_dir=None):
         jumpstart_ip = next((n.get('gateway') for n in networks_list if n.get('name') == primary_net_name), None)
         
         if not jumpstart_ip:
-            print(f"[-] Error: No se pudo determinar la IP del jumpstart para la red {primary_net_name}.")
+            print(f"[{RED}-{NC}] Error: No se pudo determinar la IP del jumpstart para la red {primary_net_name}.")
             continue
             
         _generate_pxe_menu(name, mac, jumpstart_ip, tftp_pxe_dir)
         _generate_autoinstall_files(node, jumpstart_ip, ssh_key, templates_dir, web_autoinstall_dir, networks_list)
+        processed_nodes += 1
+        
+    if processed_nodes > 0:
+        print(f"[{GREEN}+{NC}] Generados menús PXE y plantillas Cloud-Init para {processed_nodes} nodos.")
 
     # 3. Reiniciar servicios
     if is_live_server:
-        print("[*] Reiniciando servicios en el Jumpstart...")
+        print(f"[{CYAN}*{NC}] Reiniciando servicios en el Jumpstart...")
         subprocess.run(["systemctl", "restart", "isc-dhcp-server"])
         subprocess.run(["systemctl", "restart", "tftpd-hpa"])
         subprocess.run(["systemctl", "restart", "apache2"])
-        print("[+] Servicios DHCP, TFTP y HTTP actualizados y activos.")
+        print(f"[{GREEN}+{NC}] Servicios DHCP, TFTP y HTTP actualizados y activos.")
         
-    print("[*] Generación de configuraciones finalizada exitosamente.")
+    print(f"[{GREEN}✓{NC}] Generación de configuraciones finalizada exitosamente.")
