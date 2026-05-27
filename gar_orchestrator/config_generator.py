@@ -114,7 +114,7 @@ def _generate_pxe_menu(name, mac, jumpstart_ip, tftp_pxe_dir):
         f.write(pxe_menu_content)
     print(f"[+] Menú PXE generado para {name} -> {pxe_file_path}")
 
-def _generate_autoinstall_files(node, jumpstart_ip, ssh_key, templates_dir, web_autoinstall_dir):
+def _generate_autoinstall_files(node, jumpstart_ip, ssh_key, templates_dir, web_autoinstall_dir, networks_list):
     """Genera los archivos meta-data y user-data inyectando variables en las plantillas."""
     name = node.get('name')
     
@@ -155,11 +155,16 @@ def _generate_autoinstall_files(node, jumpstart_ip, ssh_key, templates_dir, web_
             # Interfaz NAT de VirtualBox: usa DHCP (VBox asigna IP automáticamente)
             netplan_interface_config += f"      {nic_name}:\n        dhcp4: true"
         else:
+            # Buscar la red global para heredar configuraciones
+            global_net = next((n for n in networks_list if n.get('name') == net.get('name')), {})
+            
             # Interfaz de red interna: configuración estática
             ip = net.get('ip', '')
-            nm = net.get('netmask', '255.255.255.0')
-            gw = net.get('gateway', '')
-            dns_list = net.get('dns', [])
+            # Usar .get() con el valor global como default
+            nm = net.get('netmask', global_net.get('netmask', '255.255.255.0'))
+            gw = net.get('gateway', global_net.get('gateway', ''))
+            dns_list = net.get('dns', global_net.get('dns', []))
+            
             cidr = "24" if nm == '255.255.255.0' else "16"
             
             netplan_interface_config += f"      {nic_name}:\n        dhcp4: false\n        addresses:\n          - {ip}/{cidr}"
@@ -215,7 +220,7 @@ def generate_pxe_configs(nodes, templates_dir=None):
             continue
             
         _generate_pxe_menu(name, mac, jumpstart_ip, tftp_pxe_dir)
-        _generate_autoinstall_files(node, jumpstart_ip, ssh_key, templates_dir, web_autoinstall_dir)
+        _generate_autoinstall_files(node, jumpstart_ip, ssh_key, templates_dir, web_autoinstall_dir, networks_list)
 
     # 3. Reiniciar servicios
     if is_live_server:

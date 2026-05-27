@@ -4,9 +4,6 @@ mac: "08:00:27:00:02:0C"
 networks:
   - name: intnet_internal
     ip: "192.168.2.12"
-    netmask: "255.255.255.0"
-    gateway: "192.168.2.254"
-    dns: ["8.8.8.8", "8.8.4.4"]
 vbox_specs:
   cpus: 1
   ram_mb: 7168
