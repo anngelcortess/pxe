@@ -7,6 +7,12 @@ import subprocess
 import urllib.request
 import urllib.error
 
+GREEN = '\033[92m'
+YELLOW = '\033[93m'
+CYAN = '\033[96m'
+RED = '\033[91m'
+NC = '\033[0m'
+
 def _make_get_request(api_url, path):
     """Realiza una petición GET genérica a la API de VirtualBox."""
     if not api_url:
@@ -180,28 +186,42 @@ def undeploy_virtualbox_vms(nodes, host_api_url):
 
 def start_virtualbox_vms(nodes, host_api_url, vm_type="headless"):
     """Inicia las VMs a través de la API del Host."""
-    print(f"[*] Iniciando {len(nodes)} VMs a través de la API del Host...")
-    for node in nodes:
+    vms_to_process = [n for n in nodes if n.get('name') != 'jumpstart']
+    print(f"[{CYAN}*{NC}] Enviando orden de INICIO para {len(vms_to_process)} VMs a través de la API del Host...")
+    
+    success_count = 0
+    error_count = 0
+    
+    for node in vms_to_process:
         name = node.get('name')
-        if name == 'jumpstart':
-            continue
-        print(f"[*] Iniciando VM '{name}' ({vm_type})...")
         result = _make_api_request(host_api_url, "/vbox/start", {"vm": name, "type": vm_type})
         if result and result.get("status") == "ok":
-            print(f"[+] Éxito: {result.get('message')}")
+            success_count += 1
         else:
-            print(f"[-] Error al iniciar '{name}': {result.get('message') if result else 'Sin respuesta'}")
+            error_count += 1
+            
+    if success_count > 0:
+        print(f"[{GREEN}✓{NC}] {success_count} VMs iniciadas con éxito.")
+    if error_count > 0:
+        print(f"[{YELLOW}!{NC}] {error_count} VMs no se pudieron iniciar (puede que no existan o ya estén encendidas).")
 
 def stop_virtualbox_vms(nodes, host_api_url, mode="poweroff"):
     """Detiene las VMs a través de la API del Host."""
-    print(f"[*] Deteniendo {len(nodes)} VMs a través de la API del Host...")
-    for node in nodes:
+    vms_to_process = [n for n in nodes if n.get('name') != 'jumpstart']
+    print(f"[{CYAN}*{NC}] Enviando orden de PARADA para {len(vms_to_process)} VMs a través de la API del Host...")
+    
+    success_count = 0
+    error_count = 0
+    
+    for node in vms_to_process:
         name = node.get('name')
-        if name == 'jumpstart':
-            continue
-        print(f"[*] Deteniendo VM '{name}' ({mode})...")
         result = _make_api_request(host_api_url, "/vbox/stop", {"vm": name, "mode": mode})
         if result and result.get("status") == "ok":
-            print(f"[+] Éxito: {result.get('message')}")
+            success_count += 1
         else:
-            print(f"[-] Error al detener '{name}': {result.get('message') if result else 'Sin respuesta'}")
+            error_count += 1
+            
+    if success_count > 0:
+        print(f"[{GREEN}✓{NC}] {success_count} VMs detenidas con éxito.")
+    if error_count > 0:
+        print(f"[{YELLOW}!{NC}] {error_count} VMs no se pudieron detener (puede que no existan o ya estén apagadas).")
