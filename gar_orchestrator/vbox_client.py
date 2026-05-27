@@ -47,15 +47,20 @@ def _make_api_request(api_url, path, payload_dict):
     try:
         with urllib.request.urlopen(req, timeout=10) as response:
             return json.loads(response.read().decode('utf-8'))
+    except urllib.error.HTTPError as e:
+        # Si el servidor devuelve 500 pero con JSON, lo parseamos silenciosamente
+        err_body = e.read().decode('utf-8', errors='ignore')
+        try:
+            return json.loads(err_body)
+        except json.JSONDecodeError:
+            print(f"[{RED}-{NC}] Error HTTP {e.code} en {endpoint}")
+            return None
     except urllib.error.URLError as e:
-        print(f"[-] Error al contactar con la API del Host ({endpoint}): {e}")
-        if hasattr(e, 'read'):
-            err_body = e.read().decode('utf-8', errors='ignore')
-            print(f"    Detalle del servidor: {err_body}")
-        print("\n[!] Asegúrate de que vbox_api_server.py se está ejecutando en tu Host físico.")
+        print(f"[{RED}-{NC}] Error de conexión con la API del Host ({endpoint}): {e}")
+        print(f"[{YELLOW}!{NC}] Asegúrate de que vbox_api_server.py se está ejecutando en tu Host físico.")
         return None
     except Exception as e:
-        print(f"[!] Error inesperado al llamar a la API {endpoint}: {e}")
+        print(f"[{RED}!{NC}] Error inesperado al llamar a la API {endpoint}: {e}")
         return None
 
 def _change_boot_order(host_api_url, name):
