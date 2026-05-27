@@ -70,6 +70,7 @@
         chain: POSTROUTING
         out_interface: enp0s3
         jump: MASQUERADE
+      notify: Guardar reglas de iptables
 
     - name: "NAT: Permitir Forwarding desde red Main (enp0s9)"
       iptables:
@@ -77,6 +78,7 @@
         in_interface: enp0s9
         out_interface: enp0s3
         jump: ACCEPT
+      notify: Guardar reglas de iptables
 
     - name: "NAT: Permitir Forwarding desde red Internal (enp0s10)"
       iptables:
@@ -84,15 +86,14 @@
         in_interface: enp0s10
         out_interface: enp0s3
         jump: ACCEPT
+      notify: Guardar reglas de iptables
 
     - name: "NAT: Permitir tráfico establecido/relacionado"
       iptables:
         chain: FORWARD
         ctstate: ESTABLISHED,RELATED
         jump: ACCEPT
-
-    - name: "NAT: Guardar reglas de iptables"
-      command: netfilter-persistent save
+      notify: Guardar reglas de iptables
 
     - name: "SISTEMA: Instalar paquetes básicos"
       apt:
@@ -188,7 +189,7 @@
       args:
         chdir: "{{ repo_dir }}"
       register: provisioner_out
-      changed_when: provisioner_out.rc == 0
+      changed_when: false
 
     - name: "ORQUESTADOR: Copiar config-manager.service"
       copy:
@@ -213,6 +214,9 @@
     - name: Aplicar Netplan
       command: netplan apply
     
+    - name: Guardar reglas de iptables
+      command: netfilter-persistent save
+
     - name: Reiniciar TFTP
       service:
         name: tftpd-hpa
