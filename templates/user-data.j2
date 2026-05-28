@@ -54,6 +54,7 @@ autoinstall:
     - "curtin in-target systemctl disable unattended-upgrades.service"
     # Notificar al jumpstart que la instalación ha terminado (anti-loop PXE + lanzar Ansible)
     - "curl -sf http://{{ jumpstart_ip }}:{{ callback_port }}/node-ready?node={{ node.name }} || true"
-    # Forzar apagado limpio en vez del reboot por defecto de Subiquity.
-    # Esto permite a la API del Host cambiar el boot order a disco antes de reencender.
-    - "shutdown -P now"
+  power_state:
+    mode: poweroff
+    message: "Instalación completada. Apagando nodo para cambio de boot order."
+    condition: True
