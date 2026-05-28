@@ -1,109 +1,105 @@
 # 02. Guía de Despliegue Paso a Paso
 
-Esta guía explica de forma detallada cómo utilizar nuestra infraestructura desde el punto de vista del operador, y finaliza con la estrategia recomendada para hacer la demostración presencial (defensa de la práctica) ante el profesorado.
+Esta guía explica de forma detallada cómo operar la infraestructura desde el punto de vista del administrador. Las herramientas han sido abstraídas en un único CLI para que la experiencia sea similar a usar herramientas como Terraform o Vagrant.
 
 ---
 
 ## FASE 1: Preparación del Anfitrión (Host)
 
-Para que nuestra orquestación funcione, el script de Python que corre en el Jumpstart necesita poder comunicarse con tu VirtualBox local.
+Nuestra arquitectura delega las operaciones pesadas de hipervisor en una API REST que corre directamente en el ordenador físico.
 
 1. Abre un terminal en la raíz del proyecto en tu máquina física (Host).
-2. Ejecuta el instalador del servicio API de VirtualBox:
+2. Instala y levanta el servicio API de VirtualBox:
    ```bash
    ./scripts/vbox-api-helper.sh install
    ```
-3. Comprueba que está funcionando haciendo una llamada de salud a la API:
+3. Comprueba que está funcionando:
    ```bash
    curl http://localhost:7070/health
-   # Debería devolver: {"status": "ok", "message": "VBox API Server is running"}
+   # Respuesta esperada: {"status": "ok", "message": "VBox API Server is running"}
    ```
 
-*(Opcional: Si quieres ver en tiempo real qué órdenes está recibiendo VirtualBox, puedes abrir otra pestaña de terminal y usar `./scripts/vbox-api-helper.sh logs`).*
+*(Opcional: Si quieres monitorizar en tiempo real los comandos que recibe VirtualBox, usa `./scripts/vbox-api-helper.sh logs -f`).*
 
 ---
 
-## FASE 2: Inicialización del Servidor Jumpstart
+## FASE 2: Preparación del Servidor Jumpstart
 
-El Jumpstart es el corazón de nuestra red. Es la única máquina que habremos creado "a mano" previamente clonando de una Ubuntu Server 22.04 base (del primer lab). 
+El Jumpstart es el enrutador central y el director de orquesta. Es la única máquina que debemos levantar manualmente (a partir de la Ubuntu base del primer laboratorio).
 
-1. Arranca tu VM Jumpstart desde la interfaz de VirtualBox.
-2. Sube la carpeta de este proyecto a la VM (usando `git clone`, carpetas compartidas de VBox o `scp`).
-3. Entra a la VM por SSH o consola gráfica, sitúate en la raíz del proyecto y ejecuta:
+1. Arranca tu VM Jumpstart.
+2. Clona este repositorio dentro de la máquina.
+3. Entra a la VM por SSH, sitúate en la raíz del proyecto y ejecuta el bootstrap de inicialización:
    ```bash
    sudo ./scripts/bootstrap_jumpstart.sh
    ```
 
-**¿Qué hace el Bootstrap Script?**
-* Configura la IP estática del servidor en Netplan.
-* Instala las herramientas de red necesarias (`isc-dhcp-server`, `tftpd-hpa`, `apache2`).
-* Habilita enmascaramiento NAT (`iptables`) para que los nodos en instalación tengan salida a Internet.
-* Extrae el kernel instalador de Ubuntu.
-* Levanta el microservicio `provision-callback.service` en el puerto 8081.
+**¿Qué ocurre en este paso?**
+* Se configura Netplan con la IP estática.
+* Se configuran servicios base de red (`dhcp`, `tftpd`, `apache2`).
+* Se instalan las dependencias de Python, Jinja2 y Ansible.
+* Se instala y activa el **Coordinador Global** (`provisioning-coordinator.service`).
 
-## FASE 3: Despliegue de la Maqueta Baremetal
+Puedes ver los logs del Coordinador en todo momento (¡altamente recomendado para ver "Matrix" fluir!):
+```bash
+sudo journalctl -u provisioning-coordinator -f
+```
 
-Con el Host y el Jumpstart preparados, podemos ordenar la creación de todas las máquinas virtuales definidas en `config/nodes/`.
+---
+
+## FASE 3: Despliegue y Orquestación Continua
+
+Con el entorno preparado, el despliegue de las máquinas (las 17 o solo unas pocas) es completamente desatendido.
 
 1. En el terminal del Jumpstart, ejecuta:
    ```bash
    ./provisioner.py deploy
    ```
-o para evitar desplegar 17 nodos a la vez:
-   ```bash
-   ./provisioner.py deploy <nodo, ej: load-balancer> 
-   ```
+   *(También puedes indicar un solo nodo: `./provisioner.py deploy cluster-master-1`)*
 
-**¿Qué hace este comando?**
-* **Validación**: Comprueba que no has escrito IPs duplicadas ni MACs mal formateadas.
-* **Seguridad Anticolisiones**: Si detecta que ya existen VMs de un despliegue anterior, te avisará y te pedirá confirmación (`y/N`) antes de eliminarlas (para no destruir trabajo sin querer).
-* **Creación**: Habla con la Host API y le ordena ejecutar los `VBoxManage createvm`, creando los discos duros virtuales y configurando las tarjetas de red.
-* **Encendido Silencioso**: Enciende las máquinas en modo **Headless** (sin ventana gráfica). Todas las máquinas arrancarán e intentarán hacer boot por red (PXE), quedándose a la espera.
-
----
-
-
-### FASE 4: La Instalación Mágica
-Con el Jumpstart levantado, las VMs que se habían quedado esperando en PXE en la FASE 3 comenzarán a comunicarse con él.
-1. Recibirán su IP mediante DHCP.
-2. Descargarán y ejecutarán el instalador desatendido de Ubuntu (Subiquity).
-3. Se instalarán solas, avisarán al puerto 8081 al terminar y se apagarán solas.
-4. Volverán a encenderse mágicamente, esta vez arrancando desde el disco duro.
-
-*(Nota: Este proceso puede tardar entre 5 y 15 minutos dependiendo de la potencia de tu Host y la velocidad de descarga de Internet).*
+**¿Qué sucede a continuación? (Automatización Total)**
+1. **Validación:** El orquestador chequea la sintaxis de tus YAMLs y cruza IPs y MACs buscando solapamientos.
+2. **Generación PXE:** Compila todas las plantillas dinámicamente y las vuelca en `/var/www/html`.
+3. **Petición en Lote:** Envía la lista de tareas al Coordinador en background. Ya puedes cerrar la terminal si quieres, el Coordinador se encargará de todo.
+4. **Ventana Deslizante:** El Coordinador crea y arranca las VMs en pequeños grupos de 3 (para no colapsar la RAM del anfitrión).
+5. **Autoinstall y Callbacks:** Las VMs arrancan por red, se instalan solas vía Subiquity/Cloud-Init, y cuando terminan, envían una notificación HTTP al Coordinador y **se apagan solas**.
+6. **Ansible:** Una vez todas las máquinas de la cola han emitido su señal de vida, el Coordinador las enciende todas a la vez e inyecta la configuración de Ansible por SSH.
 
 ---
 
-## 🛠️ Comandos de Mantenimiento
+## 🛠️ Comandos de Mantenimiento Diarios
 
-Nuestro CLI `provisioner.py` tiene otras acciones útiles para el día a día:
+El CLI principal (`provisioner.py`) soporta operaciones masivas eficientes (utilizando endpoints batch contra la API del Host):
 
-* **Limpieza Total (Desmontar Maqueta)**:
+* **Destrucción Total (Scorched Earth):**
+  Borra todas las VMs y elimina los discos duros de forma segura (con bloqueos anti-lock).
   ```bash
   ./provisioner.py undeploy
   ```
-* **Acciones Quirúrgicas (Solo un nodo)**:
-  Si rompemos el load-balancer haciendo pruebas y queremos reinstalar **solo** ese nodo sin afectar al resto:
+* **Destrucción Quirúrgica (Reparación):**
+  Si has roto una máquina experimentando, bórrala y vuelve a desplegarla en segundos:
   ```bash
   ./provisioner.py undeploy load-balancer
   ./provisioner.py deploy load-balancer
   ```
-* **Control de Energía**:
+* **Control de Energía Sincronizado:**
+  Por defecto, hemos configurado el sistema para apagar las máquinas de forma "elegante" y segura para no corromper bases de datos, simulando una pulsación del botón de apagado (ACPI).
   ```bash
-  ./provisioner.py stop --mode savestate   # Guarda el estado de la RAM de todas las VMs
-  ./provisioner.py start                   # Despierta todas las VMs
+  ./provisioner.py stop                   # Apagado ordenado (acpipowerbutton)
+  ./provisioner.py stop --mode poweroff   # Tiro de cable instantáneo (peligroso)
+  ./provisioner.py stop --mode savestate  # Hiberna todas las VMs en disco
+  ./provisioner.py start                  # Despierta todas las VMs
   ```
 
 ---
 
-## 🎓 Estrategia para la Defensa Presencial
+## 🎓 Estrategia de Defensa en la Clase
 
-Para demostrar al profesorado que nuestra autoinstalación baremetal es real y 100% dinámica, recomendamos seguir estos pasos durante la evaluación:
+Para la demostración final presencial de esta Fase 2, se sugiere este enfoque:
 
-1. Tener la maqueta ya completamente instalada y configurada por Ansible en estado apagado.
-2. Crear **manualmente** una nueva VM vacía en VirtualBox delante del profesor.
-3. Copiar la dirección MAC de uno de los archivos YAML (por ejemplo `08:00:27:00:01:0A` del `load-balancer.yml`) y ponérsela a mano a esa VM temporal en la interfaz de VirtualBox.
-4. Conectar esa VM a la red interna correspondiente.
-5. **Encenderla**. El profesor observará en directo cómo la VM hace PXE, el Jumpstart la reconoce por su MAC, le entrega la configuración exacta de Load Balancer, y se auto-instala sin que toquemos el teclado.
-6. Una vez empiece a instalar paquetes (demostrando que el aprovisionamiento baremetal funciona), apagar esa VM temporal.
-7. Encender la maqueta real definitiva y enseñar los servicios de la Fase 2 funcionando.
+1. Mantén la maqueta completamente desplegada pero apagada (hibernada o ACPI).
+2. Haz `undeploy` y `deploy` de **una sola máquina auxiliar** (ej. un hotdesk) delante de los profesores. Mostrará toda la magia (DHCP, TFTP, Cloud-Init y Ansible) sin tener que esperar 20 minutos por el clúster entero.
+3. Muestra los logs divididos en dos pantallas:
+   * **Consola Host:** `journalctl --user -u vbox-api -f` (Se ven las órdenes VBoxManage).
+   * **Consola Jumpstart:** `sudo journalctl -u provisioning-coordinator -f` (Se ve la cola deslizante, los callbacks y Ansible).
+4. Mientras el nodo solitario termina, enciende el resto del clúster con `./provisioner.py start` para demostrar que los servicios principales ya están en producción.

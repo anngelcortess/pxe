@@ -19,14 +19,14 @@ Hemos finalizado al 100% la primera fase de infraestructura base del proyecto, i
 
 ---
 
-## ⏳ FASE 2: Configuración de Servicios / Ansible (Pendiente)
+## ⏳ FASE 2: Configuración de Servicios / Ansible (En Progreso)
 
-La segunda fase del proyecto consiste en aprovisionar los servicios finales dentro de las máquinas que nuestra Fase 1 ha instalado con éxito, utilizando Ansible. El Stack tecnológico exacto a utilizar todavía debe ser decidido por el equipo.
+La segunda fase del proyecto consiste en aprovisionar los servicios finales dentro de las máquinas que nuestra Fase 1 ha instalado con éxito, utilizando Ansible.
 
 ### Roadmap de Tareas (Basado en el Enunciado):
-- [ ] **Setup Inicial de Ansible**: 
-  - [x] Crear estructura de carpetas (`playbooks/`, `roles/`, `inventory/`).
-  - [ ] Generar el inventario dinámico o estático leyendo nuestros propios archivos YAML de la Fase 1.
+- [x] **Setup Inicial de Ansible**: 
+  - [x] Crear estructura de carpetas (`ansible/playbooks/`, `ansible/roles/`).
+  - [x] Integrar la ejecución del playbook dentro del Coordinador (transición automática Baremetal -> Ansible).
 - [ ] **Configuración del Balanceador (Requisitos 6, 7 y 9)**:
   - Instalar HAProxy o Nginx (a decidir).
   - Configurar las reglas de iptables/NAT para actuar como pasarela a Internet para la red MAIN.
