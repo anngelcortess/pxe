@@ -7,6 +7,7 @@ host_api:
 jumpstart:
   callback_port: 8081
   ssh_user: "admin"
+  batch_size: 3
 
 defaults:
   vm_user: "admin"

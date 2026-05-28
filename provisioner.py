@@ -204,7 +204,8 @@ def main():
 
     elif args.action == 'listen-callbacks':
         port = args.port if args.port else settings.get('jumpstart', {}).get('callback_port', 8081)
-        run_callback_server(nodes, host_api_url, port=port)
+        batch_size = settings.get('jumpstart', {}).get('batch_size', 3)
+        run_callback_server(nodes, host_api_url, port=port, batch_size=batch_size)
 
 if __name__ == '__main__':
     main()

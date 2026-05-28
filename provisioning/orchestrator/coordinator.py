@@ -192,10 +192,11 @@ def process_node_ready(node_name):
             state.completed_nodes = []
             log.info("Despliegue global finalizado. Orquestador vuelve a estado IDLE.")
 
-def run_callback_server(nodes, host_api_url, port=8081):
+def run_callback_server(nodes, host_api_url, port=8081, batch_size=3):
     global host_api_global
     host_api_global = host_api_url
-    log.info(f"=== Servidor Coordinador iniciando en puerto {port} ===")
+    state.batch_size = batch_size
+    log.info(f"=== Servidor Coordinador iniciando en puerto {port} (Batch Size: {batch_size}) ===")
     server = http.server.HTTPServer(('0.0.0.0', port), CoordinatorHandler)
     try:
         server.serve_forever()
