@@ -94,6 +94,11 @@ def deploy_virtualbox_vms(nodes, host_api_url, vm_dir=None):
     for node in vms_to_process:
         prov = node.get("provisioning", {})
         specs = node.get("vbox_specs", {})
+        networks = node.get("networks", [])
+        if networks and node.get("mac"):
+            # Añadir la MAC principal a la primera interfaz de red para que vbox_api_server la configure
+            networks[0]["mac"] = node.get("mac")
+
         payload_vms.append({
             "name": node.get("name"),
             "ostype": "Ubuntu_64",
@@ -102,7 +107,7 @@ def deploy_virtualbox_vms(nodes, host_api_url, vm_dir=None):
             "disk_gb": specs.get("disk_gb", 10),
             "vram": 16,
             "graphicscontroller": "vmsvga",
-            "networks": node.get("networks", [])
+            "networks": networks
         })
 
     result = _make_api_request(host_api_url, "/vbox/create-vms", {"vms": payload_vms})
