@@ -11,7 +11,7 @@ Para que nuestra orquestación funcione, el script de Python que corre en el Jum
 1. Abre un terminal en la raíz del proyecto en tu máquina física (Host).
 2. Ejecuta el instalador del servicio API de VirtualBox:
    ```bash
-   ./vbox-api-helper.sh install
+   ./scripts/vbox-api-helper.sh install
    ```
 3. Comprueba que está funcionando haciendo una llamada de salud a la API:
    ```bash
@@ -19,7 +19,7 @@ Para que nuestra orquestación funcione, el script de Python que corre en el Jum
    # Debería devolver: {"status": "ok", "message": "VBox API Server is running"}
    ```
 
-*(Opcional: Si quieres ver en tiempo real qué órdenes está recibiendo VirtualBox, puedes abrir otra pestaña de terminal y usar `./vbox-api-helper.sh logs`).*
+*(Opcional: Si quieres ver en tiempo real qué órdenes está recibiendo VirtualBox, puedes abrir otra pestaña de terminal y usar `./scripts/vbox-api-helper.sh logs`).*
 
 ---
 
@@ -31,7 +31,7 @@ El Jumpstart es el corazón de nuestra red. Es la única máquina que habremos c
 2. Sube la carpeta de este proyecto a la VM (usando `git clone`, carpetas compartidas de VBox o `scp`).
 3. Entra a la VM por SSH o consola gráfica, sitúate en la raíz del proyecto y ejecuta:
    ```bash
-   sudo ./provisioning/scripts/bootstrap_jumpstart.sh
+   sudo ./scripts/bootstrap_jumpstart.sh
    ```
 
 **¿Qué hace el Bootstrap Script?**

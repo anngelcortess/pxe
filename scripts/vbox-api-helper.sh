@@ -4,7 +4,7 @@
 # ==============================================================================
 set -euo pipefail
 
-REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 SERVICE_NAME="vbox-api"
 SERVICE_FILE="${REPO_DIR}/provisioning/services/${SERVICE_NAME}.service"
 SYSTEMD_DIR="${HOME}/.config/systemd/user"
