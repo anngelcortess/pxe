@@ -17,5 +17,5 @@ defaults:
     ram_mb: 7168
   vbox_specs:
     cpus: 1
-    ram_mb: 2048
+    ram_mb: 1024
     disk_gb: 10

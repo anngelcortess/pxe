@@ -1,9 +1,4 @@
-import os
-import sys
-import socket
-import time
 import json
-import subprocess
 import urllib.request
 import urllib.error
 
@@ -42,13 +37,12 @@ def _make_api_request(api_url, path, payload_dict):
     
     req = urllib.request.Request(endpoint, data=payload, method="POST")
     req.add_header('Content-Type', 'application/json')
-    req.add_header('Content-Length', len(payload))
+    req.add_header('Content-Length', str(len(payload)))
     
     try:
         with urllib.request.urlopen(req, timeout=10) as response:
             return json.loads(response.read().decode('utf-8'))
     except urllib.error.HTTPError as e:
-        # Si el servidor devuelve 500 pero con JSON, lo parseamos silenciosamente
         err_body = e.read().decode('utf-8', errors='ignore')
         try:
             return json.loads(err_body)
@@ -57,7 +51,6 @@ def _make_api_request(api_url, path, payload_dict):
             return None
     except urllib.error.URLError as e:
         print(f"[{RED}-{NC}] Error de conexión con la API del Host ({endpoint}): {e}")
-        print(f"[{YELLOW}!{NC}] Asegúrate de que vbox_api_server.py se está ejecutando en tu Host físico.")
         return None
     except Exception as e:
         print(f"[{RED}!{NC}] Error inesperado al llamar a la API {endpoint}: {e}")
@@ -76,27 +69,18 @@ def apply_post_install_specs(host_api_url, node):
     })
     
     if result and result.get("status") == "ok":
-        print(f"[+] Éxito: {result.get('message', 'Orden de arranque y recursos actualizados')}")
+        print(f"[{GREEN}✓{NC}] Éxito: {result.get('message', 'Orden de arranque y recursos actualizados')}")
         return True
-    else:
-        print(f"    Puedes cambiarlo manualmente en el Host con:")
-        print(f"    VBoxManage modifyvm '{name}' --boot1 disk --boot2 net --memory {specs.get('ram_mb', 1024)}")
-        return False
+    return False
 
-
-def deploy_virtualbox_vms(nodes, host_api_url, vm_dir=None):
-    """Hace una petición a la API del Host para desplegar las VMs con recursos de aprovisionamiento."""
-    vms_to_process = [n for n in nodes if n.get('name') != 'jumpstart']
-    print(f"[{CYAN}*{NC}] Iniciando despliegue masivo (deploy) de {len(vms_to_process)} VMs a través de la API del Host...")
-    
-    # Procesando y adaptando la configuración de los YAMLs al formato de la API
+def create_vms(nodes, host_api_url):
+    """Prepara la configuración y pide a VirtualBox que cree las VMs."""
     payload_vms = []
-    for node in vms_to_process:
+    for node in nodes:
         prov = node.get("provisioning", {})
         specs = node.get("vbox_specs", {})
         networks = node.get("networks", [])
         if networks and node.get("mac"):
-            # Añadir la MAC principal a la primera interfaz de red para que vbox_api_server la configure
             networks[0]["mac"] = node.get("mac")
 
         payload_vms.append({
@@ -111,25 +95,18 @@ def deploy_virtualbox_vms(nodes, host_api_url, vm_dir=None):
         })
 
     result = _make_api_request(host_api_url, "/vbox/create-vms", {"vms": payload_vms})
-    
     if result and result.get("status") == "ok":
-        print(f"[{GREEN}✓{NC}] {result.get('message', 'Despliegue completado')}")
-        for msg in result.get('details', []):
-            print(f"    - {msg}")
+        print(f"[{GREEN}✓{NC}] API Host: VMs creadas y enviadas a PXE.")
     else:
-        print(f"[{RED}!{NC}] Fallo en el despliegue.")
+        print(f"[{RED}!{NC}] Fallo al contactar con Host API para create-vms.")
 
 def undeploy_virtualbox_vms(nodes, host_api_url):
     """Hace una petición a la API del Host para eliminar todas las VMs."""
     vms_to_process = [{"name": n.get('name')} for n in nodes if n.get('name') != 'jumpstart']
     print(f"[{CYAN}*{NC}] Enviando petición de borrado masivo de {len(vms_to_process)} VMs a la API del Host...")
-    
     result = _make_api_request(host_api_url, "/vbox/delete-vms", {"vms": vms_to_process})
-    
     if result and result.get("status") == "ok":
         print(f"[{GREEN}✓{NC}] {result.get('message', 'Desinstalación completada')}")
-        for msg in result.get('details', []):
-            print(f"    - {msg}")
     else:
         print(f"[{RED}!{NC}] Fallo en la desinstalación.")
 
@@ -137,40 +114,16 @@ def start_virtualbox_vms(nodes, host_api_url, vm_type="headless"):
     """Inicia las VMs a través de la API del Host."""
     vms_to_process = [n for n in nodes if n.get('name') != 'jumpstart']
     print(f"[{CYAN}*{NC}] Enviando orden de INICIO para {len(vms_to_process)} VMs a través de la API del Host...")
-    
-    success_count = 0
-    error_count = 0
-    
     for node in vms_to_process:
         name = node.get('name')
-        result = _make_api_request(host_api_url, "/vbox/start", {"vm": name, "type": vm_type})
-        if result and result.get("status") == "ok":
-            success_count += 1
-        else:
-            error_count += 1
-            
-    if success_count > 0:
-        print(f"[{GREEN}✓{NC}] {success_count} VMs iniciadas con éxito.")
-    if error_count > 0:
-        print(f"[{YELLOW}!{NC}] {error_count} VMs no se pudieron iniciar (puede que no existan o ya estén encendidas).")
+        _make_api_request(host_api_url, "/vbox/start", {"vm": name, "type": vm_type})
+    print(f"[{GREEN}✓{NC}] Órdenes de encendido enviadas.")
 
 def stop_virtualbox_vms(nodes, host_api_url, mode="poweroff"):
     """Detiene las VMs a través de la API del Host."""
     vms_to_process = [n for n in nodes if n.get('name') != 'jumpstart']
     print(f"[{CYAN}*{NC}] Enviando orden de PARADA para {len(vms_to_process)} VMs a través de la API del Host...")
-    
-    success_count = 0
-    error_count = 0
-    
     for node in vms_to_process:
         name = node.get('name')
-        result = _make_api_request(host_api_url, "/vbox/stop", {"vm": name, "mode": mode})
-        if result and result.get("status") == "ok":
-            success_count += 1
-        else:
-            error_count += 1
-            
-    if success_count > 0:
-        print(f"[{GREEN}✓{NC}] {success_count} VMs detenidas con éxito.")
-    if error_count > 0:
-        print(f"[{YELLOW}!{NC}] {error_count} VMs no se pudieron detener (puede que no existan o ya estén apagadas).")
+        _make_api_request(host_api_url, "/vbox/stop", {"vm": name, "mode": mode})
+    print(f"[{GREEN}✓{NC}] Órdenes de parada enviadas.")
