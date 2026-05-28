@@ -118,7 +118,7 @@ def start_virtualbox_vms(nodes, host_api_url, vm_type="headless"):
     _make_api_request(host_api_url, "/vbox/start", {"vms": vms_to_process, "type": vm_type})
     print(f"[{GREEN}✓{NC}] Órdenes de encendido enviadas.")
 
-def stop_virtualbox_vms(nodes, host_api_url, mode="poweroff"):
+def stop_virtualbox_vms(nodes, host_api_url, mode="acpipowerbutton"):
     """Detiene las VMs a través de la API del Host."""
     vms_to_process = [n.get('name') for n in nodes if n.get('name') != 'jumpstart']
     if not vms_to_process: return

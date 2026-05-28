@@ -259,10 +259,10 @@ class VBoxAPIHandler(http.server.BaseHTTPRequestHandler):
                 self._ok(message=f'{len(vms)} VMs iniciadas en modo {vm_type}')
 
         # POST /vbox/stop
-        # Body: {"vms": ["nombre1", "nombre2"], "mode": "poweroff"}  (mode opcional, default poweroff)
+        # Body: {"vms": ["nombre1", "nombre2"], "mode": "acpipowerbutton"}  (mode opcional, default acpipowerbutton)
         elif path == "/vbox/stop":
             vms  = body.get("vms", [])
-            mode = body.get("mode", "poweroff")
+            mode = body.get("mode", "acpipowerbutton")
 
             if not vms or not isinstance(vms, list):
                 self._error(400, 'Campo "vms" requerido y debe ser una lista')
@@ -377,8 +377,14 @@ class VBoxAPIHandler(http.server.BaseHTTPRequestHandler):
                 
                 if name in existing_vms:
                     vbox("controlvm", sanitize_vm_name(name), "poweroff")
-                    if vbox("unregistervm", sanitize_vm_name(name), "--delete")[0]:
-                        log_msgs.append(f"VM '{name}' eliminada")
+                    
+                    # Reintentar el borrado hasta 5 veces para evitar el VBOX_E_INVALID_OBJECT_STATE (lock)
+                    for _ in range(5):
+                        if vbox("unregistervm", sanitize_vm_name(name), "--delete")[0]:
+                            log_msgs.append(f"VM '{name}' eliminada")
+                            break
+                        import time
+                        time.sleep(1)
             
             self._ok(message="Borrado masivo completado", details=log_msgs)
 

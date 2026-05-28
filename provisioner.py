@@ -93,7 +93,7 @@ def main():
 
     parser_stop = subparsers.add_parser('stop', parents=[parent_parser], help="Detener las VMs en VirtualBox (excepto jumpstart)")
     parser_stop.add_argument('node', nargs='?', help="Nombre de un nodo específico para detener (opcional, por defecto todos)")
-    parser_stop.add_argument('--mode', choices=['poweroff', 'acpipowerbutton', 'savestate', 'pause', 'resume'], default='poweroff', help="Modo de parada de la VM (poweroff, acpipowerbutton, savestate, pause, resume)")
+    parser_stop.add_argument('--mode', choices=['poweroff', 'acpipowerbutton', 'savestate', 'pause', 'resume'], default='acpipowerbutton', help="Modo de parada de la VM (poweroff, acpipowerbutton, savestate, pause, resume)")
 
     args = parser.parse_args()
     
