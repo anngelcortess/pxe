@@ -4,15 +4,32 @@
 # ==============================================================================
 set -euo pipefail
 
+REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
 SERVICE_NAME="provisioning-coordinator"
+SERVICE_FILE="${REPO_DIR}/provisioning/services/${SERVICE_NAME}.service"
+TARGET_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
 
 # Pedir elevación de privilegios solo para acciones que lo requieren
-if [[ "$EUID" -ne 0 && "${1:-}" =~ ^(start|stop|restart)$ ]]; then
-    echo "Por favor, ejecuta esta acción con sudo."
+if [[ "$EUID" -ne 0 && "${1:-}" =~ ^(install|uninstall|start|stop|restart)$ ]]; then
+    echo "Por favor, ejecuta esta acción con sudo o como root."
     exit 1
 fi
 
 case "${1:-}" in
+    install)
+        echo "[*] Instalando servicio a nivel de sistema..."
+        sed "s|__REPO_DIR__|${REPO_DIR}|g" "${SERVICE_FILE}" > "${TARGET_FILE}"
+        systemctl daemon-reload
+        systemctl enable --now "${SERVICE_NAME}"
+        echo "[+] Servicio orquestador instalado y activado correctamente!"
+        ;;
+    uninstall)
+        echo "[*] Desinstalando servicio orquestador..."
+        systemctl disable --now "${SERVICE_NAME}" || true
+        rm -f "${TARGET_FILE}"
+        systemctl daemon-reload
+        echo "[+] Servicio desinstalado."
+        ;;
     start)
         echo "[*] Iniciando orquestador..."
         systemctl start "${SERVICE_NAME}"
@@ -37,11 +54,9 @@ case "${1:-}" in
         echo "========================================================"
         echo "  Controlador del Orquestador de GAR (Jumpstart)        "
         echo "========================================================"
-        echo "Uso: $0 {start|stop|restart|status|logs}"
+        echo "Uso: $0 {install|uninstall|start|stop|restart|status|logs}"
         echo ""
-        echo "Nota: A diferencia del host_service, la instalación de este"
-        echo "      demonio se realiza automáticamente vía Ansible al"
-        echo "      hacer el bootstrap del Jumpstart."
+        echo "Nota: El comando install crea los enlaces en /etc/systemd/system"
         exit 1
         ;;
 esac
