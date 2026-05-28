@@ -53,7 +53,7 @@ Si usas el parámetro `type: nat` (como en el ejemplo de arriba), el orquestador
 
 ---
 
-## 3. Plantilla Cloud-Init (`templates/user-data`)
+## 3. Plantilla Cloud-Init (`provisioning/templates/user-data`)
 
 Esta plantilla está pre-cargada con marcadores especiales que el orquestador sustituye "en caliente" (interpolación) justo antes de entregárselas a las máquinas durante la instalación.
 

@@ -25,7 +25,7 @@ Durante el aprovisionamiento baremetal, **todos** los nodos (incluso los de la r
 
 ### Pilar 1: VBox API Server (El Host)
 * **Ubicación:** Tu ordenador físico.
-* **Componentes:** `vbox_api_server.py` y `host_service.sh`.
+* **Componentes:** `provisioning/vbox_api_server.py` y `host_service.sh`.
 * **Función:** Expone una API REST en el puerto `7070`. Recibe peticiones JSON y las traduce a comandos locales de `VBoxManage`. Es el único componente con el poder real de crear VMs, eliminarlas, encenderlas y alterar su orden de arranque.
 
 ### Pilar 2: El Orquestador

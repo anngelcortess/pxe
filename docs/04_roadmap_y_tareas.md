@@ -25,8 +25,8 @@ La segunda fase del proyecto consiste en aprovisionar los servicios finales dent
 
 ### Roadmap de Tareas (Basado en el Enunciado):
 - [ ] **Setup Inicial de Ansible**: 
-  - Crear estructura de carpetas (`playbooks/`, `roles/`, `inventory/`).
-  - Generar el inventario dinámico o estático leyendo nuestros propios archivos YAML de la Fase 1.
+  - [x] Crear estructura de carpetas (`playbooks/`, `roles/`, `inventory/`).
+  - [ ] Generar el inventario dinámico o estático leyendo nuestros propios archivos YAML de la Fase 1.
 - [ ] **Configuración del Balanceador (Requisitos 6, 7 y 9)**:
   - Instalar HAProxy o Nginx (a decidir).
   - Configurar las reglas de iptables/NAT para actuar como pasarela a Internet para la red MAIN.

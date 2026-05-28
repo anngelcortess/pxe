@@ -31,7 +31,7 @@ El Jumpstart es el corazón de nuestra red. Es la única máquina que habremos c
 2. Sube la carpeta de este proyecto a la VM (usando `git clone`, carpetas compartidas de VBox o `scp`).
 3. Entra a la VM por SSH o consola gráfica, sitúate en la raíz del proyecto y ejecuta:
    ```bash
-   sudo ./scripts/bootstrap_jumpstart.sh
+   sudo ./provisioning/scripts/bootstrap_jumpstart.sh
    ```
 
 **¿Qué hace el Bootstrap Script?**

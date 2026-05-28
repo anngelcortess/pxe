@@ -64,7 +64,7 @@ La estrategia es que cada miembro asuma un "Rol" como especialista de una pieza 
 ---
 
 ### 🤝 ¿Cómo trabajar en equipo sin pisarse?
-Dentro del repositorio, cread una carpeta `ansible/`. Dentro, cada uno crea sus "roles" independientemente:
+La carpeta `ansible/` ya está inicializada en la raíz del repositorio. Dentro de ella, cada uno debe crear sus "roles" independientemente:
 - `ansible/roles/loadbalancer/` (Rol 1)
 - `ansible/roles/cms/` (Rol 2)
 - `ansible/roles/swarm/` (Rol 3)

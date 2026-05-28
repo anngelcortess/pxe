@@ -20,7 +20,7 @@ Este archivo proporciona contexto crítico, reglas de arquitectura y convencione
    * La infraestructura se define **exclusivamente** en `config/networks.yml` y `config/nodes/*.yml`.
 2. **Limitación de VirtualBox (El problema del Jumpstart):**
    * El orquestador corre en la máquina "Jumpstart" (una VM). Las VMs no pueden ejecutar `VBoxManage` para crear otras VMs en el Host.
-   * **Solución actual:** Usamos un servidor REST en el anfitrión físico (`vbox_api_server.py` en el puerto 7070). El orquestador habla con él. **NO intentes cambiar este diseño**, es fundamental.
+   * **Solución actual:** Usamos un servidor REST en el anfitrión físico (`provisioning/vbox_api_server.py` en el puerto 7070). El orquestador habla con él. **NO intentes cambiar este diseño**, es fundamental.
 3. **Flujo de Autoinstalación:**
    * Usamos PXELINUX + Ubuntu Autoinstall (Cloud-Init/Subiquity).
    * Al finalizar la instalación, las VMs **deben apagarse** (`shutdown -P now`) y lanzar un POST a `http://192.168.1.254:8081`. 
@@ -32,7 +32,7 @@ Este archivo proporciona contexto crítico, reglas de arquitectura y convencione
 
 1. **Red `main` (`192.168.1.0/24`):** Debe tener acceso a Internet. Durante la Fase 1 lo obtiene del Jumpstart (NAT). En la Fase 2, lo obtendrá del Load Balancer (que tiene una NIC NAT extra).
 2. **Red `internal` (`192.168.2.0/24`):** Red **AISLADA**. Solo puede comunicarse con la red `main`. No le configures pasarelas a Internet directas.
-3. **Múltiples NICs:** El generador de configuraciones (`gar_orchestrator/config_generator.py`) soporta múltiples tarjetas por VM. Si añades redes tipo `nat`, se configurarán por DHCP en Netplan; las internas serán estáticas.
+3. **Múltiples NICs:** El generador de configuraciones (`provisioning/orchestrator/config_generator.py`) soporta múltiples tarjetas por VM. Si añades redes tipo `nat`, se configurarán por DHCP en Netplan; las internas serán estáticas.
 
 ---
 
@@ -56,3 +56,11 @@ No asumas cómo funciona el proyecto. Lee primero la documentación oficial que 
 - `docs/02_guia_despliegue.md`: Pasos operativos.
 - `docs/03_referencia_yaml.md`: Formato de los archivos.
 - `docs/04_roadmap_y_tareas.md`: Lo que falta por hacer.
+
+---
+
+## 6. Estructura de Carpetas (Fronteras Lógicas)
+Para mantener el código escalable y organizado, el proyecto se divide estrictamente en dominios lógicos. Es vital respetar estas fronteras:
+- `provisioning/`: Contiene **todo** el código, scripts y demonios exclusivos de la Fase 1 (creación de VMs en VirtualBox y PXE). No metas aquí playbooks.
+- `ansible/`: Contiene todo lo relacionado con la Fase 2 (configuración de servicios sobre las VMs ya instaladas). No mezcles la lógica del aprovisionamiento base aquí.
+- `config/`: Es el punto de verdad universal (Single Source of Truth). Tanto la Fase 1 como la Fase 2 deben leer de aquí.

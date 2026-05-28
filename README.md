@@ -22,32 +22,28 @@ Hemos dividido la documentación en módulos específicos para facilitar la lect
 La estructura del proyecto está diseñada para ser completamente escalable:
 
 ```text
-trabajo/
+GAR/
 ├── docs/                          # 📘 Documentación del proyecto
 │   ├── 01_arquitectura.md
 │   ├── 02_guia_despliegue.md
 │   ├── 03_referencia_yaml.md
 │   ├── 04_roadmap_y_tareas.md
+│   ├── 05_reparto_fase2.md
 │   └── GAR_P1.pdf / .txt          # Enunciado original
 ├── config/                        # ⚙️ Definiciones YAML orientadas a datos
 │   ├── networks.yml               # Parametrización de subredes (main, internal)
 │   └── nodes/                     # Directorio con los YAML de los 18 nodos
-├── templates/                     # 📄 Plantillas base de Autoinstall
-│   ├── meta-data
-│   └── user-data-*                # Plantillas específicas por rol (lb, web, db...)
-├── scripts/                       # 🛠️ Scripts auxiliares y de automatización
-│   ├── bootstrap_jumpstart.sh     # Inicialización de servicios del Jumpstart
-
-├── services/                      # ⚙️ Archivos para demonios systemd
-│   ├── config-manager.service
-│   └── vbox-api.service
-├── gar_orchestrator/              # 📦 Núcleo del orquestador en Python
-│   ├── config_generator.py        # Generador de DHCP, PXE, Netplan
-│   ├── validator.py               # Validador de colisiones de IP/MAC
-│   └── vbox_client.py             # Cliente REST para controlar VirtualBox
+├── provisioning/                  # 🚀 Fase 1: Aprovisionamiento Baremetal
+│   ├── orchestrator/              # 📦 Núcleo del orquestador en Python
+│   ├── scripts/                   # 🛠️ Scripts auxiliares (bootstrap)
+│   ├── services/                  # ⚙️ Archivos para demonios systemd
+│   ├── templates/                 # 📄 Plantillas base de PXE y Autoinstall
+│   └── vbox_api_server.py         # 🔌 Servidor API REST en el Host físico
+├── ansible/                       # ⚙️ Fase 2: Configuración de Servicios
+│   └── playbooks/                 # Playbooks y roles de configuración
 ├── provisioner.py                 # 🚀 CLI principal de aprovisionamiento
-├── vbox_api_server.py             # 🔌 Servidor API REST en el Host físico
 ├── host_service.sh                # 🛠️ Script instalador para la API del Host
+├── AGENTS.md                      # Instrucciones para Agentes de IA
 ├── README.md                      # Este portal de inicio
 └── .gitignore                     # Archivo de ignorados
 ```
@@ -76,5 +72,5 @@ Si ya has leído la [Guía de Despliegue](file:///home/Chadry/esi/gyar/trabajo/d
 ### En el Servidor Jumpstart
 ```bash
 # Levantar servicios de red (DHCP, TFTP, Apache) y generar configuraciones
-sudo ./scripts/bootstrap_jumpstart.sh
+sudo ./provisioning/scripts/bootstrap_jumpstart.sh
 ```
