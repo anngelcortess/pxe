@@ -185,14 +185,14 @@
 
     - name: "ORQUESTADOR: Copiar config-manager.service"
       copy:
-        src: "{{ repo_dir }}/services/config-manager.service"
+        src: "{{ repo_dir }}/provisioning/services/config-manager.service"
         dest: /etc/systemd/system/config-manager.service
         remote_src: yes
 
     - name: "ORQUESTADOR: Inyectar ruta del repositorio en config-manager.service"
       replace:
         path: /etc/systemd/system/config-manager.service
-        regexp: '/home/admin/pxe'
+        regexp: '/home/admin/gar'
         replace: "{{ repo_dir }}"
       notify: Recargar e iniciar config-manager
 

@@ -53,7 +53,31 @@ Si usas el parámetro `type: nat` (como en el ejemplo de arriba), el orquestador
 
 ---
 
-## 3. Plantilla Cloud-Init (`provisioning/templates/user-data`)
+## 3. Configuración Global (`config/settings.yml`)
+
+Este archivo parametriza variables globales críticas para el orquestador y para las máquinas.
+
+```yaml
+host_api:
+  ip: "192.168.56.1"
+  port: 7070
+
+jumpstart:
+  callback_port: 8081
+  ssh_user: "admin"
+
+defaults:
+  vm_user: "admin"
+  vm_password: "$6$CylgQV.8wYk/VUlE$UpXhP0y5NrH3ZypUfNvOF..."
+```
+
+**Parámetros Destacados:**
+* **`host_api`**: Dónde debe contactar el Jumpstart para hablar con el Host (tu PC).
+* **`vm_password`**: La contraseña por defecto que se inyectará a todos los nodos en la Fase 1. Debe estar **hasheada** (idealmente SHA-512). Si en la Fase 2 necesitas cambiarla, puedes generar un nuevo hash usando el comando `openssl passwd -6` y pegarlo aquí.
+
+---
+
+## 4. Plantilla Cloud-Init (`provisioning/templates/user-data`)
 
 Esta plantilla está pre-cargada con marcadores especiales que el orquestador sustituye "en caliente" (interpolación) justo antes de entregárselas a las máquinas durante la instalación.
 

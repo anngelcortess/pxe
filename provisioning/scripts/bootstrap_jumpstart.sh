@@ -26,7 +26,7 @@ echo -e "${YELLOW}[*] Actualizando repositorios base e instalando Ansible...${NC
 apt-get update > /dev/null
 DEBIAN_FRONTEND=noninteractive apt-get install -y ansible git > /dev/null
 
-REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+REPO_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 
 echo -e "${YELLOW}[*] Lanzando Playbook de aprovisionamiento del Jumpstart...${NC}"
 echo -e "${GREEN}    Ansible se encargará de configurar redes, TFTP, DHCP y descargar ISOs.${NC}"
