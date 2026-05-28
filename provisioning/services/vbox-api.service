@@ -8,6 +8,8 @@ Type=simple
 # IMPORTANTE: se ejecuta como el usuario del Host para tener acceso a VirtualBox.
 # VBoxManage necesita el entorno del usuario (no root) para encontrar las VMs.
 # La ruta al script se actualiza automáticamente al instalar con el script vbox-api-helper.sh.
+WorkingDirectory=REPO_PATH
+Environment="PYTHONPATH=REPO_PATH"
 ExecStart=/usr/bin/python3 REPO_PATH/provisioning/vbox_api_server.py
 
 Restart=on-failure

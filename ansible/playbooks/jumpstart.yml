@@ -4,12 +4,12 @@
   connection: local
   become: yes
   vars:
-    repo_dir: "{{ lookup('env', 'PWD') }}"
+    repo_dir: "{{ playbook_dir | dirname | dirname }}"
     iso_url: "https://releases.ubuntu.com/22.04/ubuntu-22.04.5-live-server-amd64.iso"
     iso_path: "/var/www/html/ubuntu-22.04/ubuntu-22.04.5-live-server-amd64.iso"
   vars_files:
-    - "../config/networks.yml"
-    - "../config/settings.yml"
+    - "../../config/networks.yml"
+    - "../../config/settings.yml"
 
   tasks:
 
@@ -45,6 +45,9 @@
                           - {{ net.gateway }}/24
           {% endfor %}
       notify: Aplicar Netplan
+
+    - name: "RED: Aplicar cambios de red inmediatamente"
+      meta: flush_handlers
 
     - name: "NAT: Habilitar IP Forwarding"
       sysctl:
@@ -177,7 +180,7 @@
         ssh_key_file: .ssh/id_rsa
 
     - name: "ORQUESTADOR: Generar configuraciones finales (PXE/DHCP/Autoinstall)"
-      command: "./provisioner.py generate-configs"
+      command: "python3 provisioner.py generate-configs"
       args:
         chdir: "{{ repo_dir }}"
       register: provisioner_out
