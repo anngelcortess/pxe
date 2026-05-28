@@ -112,18 +112,16 @@ def undeploy_virtualbox_vms(nodes, host_api_url):
 
 def start_virtualbox_vms(nodes, host_api_url, vm_type="headless"):
     """Inicia las VMs a través de la API del Host."""
-    vms_to_process = [n for n in nodes if n.get('name') != 'jumpstart']
-    print(f"[{CYAN}*{NC}] Enviando orden de INICIO para {len(vms_to_process)} VMs a través de la API del Host...")
-    for node in vms_to_process:
-        name = node.get('name')
-        _make_api_request(host_api_url, "/vbox/start", {"vm": name, "type": vm_type})
+    vms_to_process = [n.get('name') for n in nodes if n.get('name') != 'jumpstart']
+    if not vms_to_process: return
+    print(f"[{CYAN}*{NC}] Enviando orden de INICIO en lote para {len(vms_to_process)} VMs a través de la API del Host...")
+    _make_api_request(host_api_url, "/vbox/start", {"vms": vms_to_process, "type": vm_type})
     print(f"[{GREEN}✓{NC}] Órdenes de encendido enviadas.")
 
 def stop_virtualbox_vms(nodes, host_api_url, mode="poweroff"):
     """Detiene las VMs a través de la API del Host."""
-    vms_to_process = [n for n in nodes if n.get('name') != 'jumpstart']
-    print(f"[{CYAN}*{NC}] Enviando orden de PARADA para {len(vms_to_process)} VMs a través de la API del Host...")
-    for node in vms_to_process:
-        name = node.get('name')
-        _make_api_request(host_api_url, "/vbox/stop", {"vm": name, "mode": mode})
+    vms_to_process = [n.get('name') for n in nodes if n.get('name') != 'jumpstart']
+    if not vms_to_process: return
+    print(f"[{CYAN}*{NC}] Enviando orden de PARADA en lote para {len(vms_to_process)} VMs a través de la API del Host...")
+    _make_api_request(host_api_url, "/vbox/stop", {"vms": vms_to_process, "mode": mode})
     print(f"[{GREEN}✓{NC}] Órdenes de parada enviadas.")

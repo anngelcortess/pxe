@@ -1,4 +1,4 @@
-#!/usr/import/env python3
+#!/usr/bin/env python3
 import os
 import sys
 import json
@@ -61,7 +61,7 @@ def preflight_checks(host_api_url, settings, need_vbox=False, need_callback=Fals
 def main():
     script_dir = os.path.dirname(os.path.abspath(__file__))
     default_nodes_dir = os.path.join(script_dir, "config", "nodes")
-    default_templates_dir = os.path.join(script_dir, "templates")
+    default_templates_dir = os.path.join(script_dir, "provisioning", "templates")
 
     parser = argparse.ArgumentParser(description="Orquestador Dinámico PXE/VirtualBox para GAR")
     subparsers = parser.add_subparsers(dest='action', required=True, help="Acción a realizar")

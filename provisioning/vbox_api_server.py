@@ -221,8 +221,7 @@ class VBoxAPIHandler(http.server.BaseHTTPRequestHandler):
                         log.info(f"[{vm_name}] La VM se ha apagado. Aplicando configuración...")
                         bg_ok, bg_out = vbox("modifyvm", sanitize_vm_name(vm_name), *args)
                         if bg_ok:
-                            log.info(f"[{vm_name}] ¡Orden de arranque actualizado! Encendiendo VM...")
-                            vbox("startvm", sanitize_vm_name(vm_name), "--type", "headless")
+                            log.info(f"[{vm_name}] ¡Orden de arranque actualizado! La VM permanecerá apagada hasta el final del despliegue.")
                         else:
                             log.error(f"[{vm_name}] Error al modificar el boot order: {bg_out}")
                         return
@@ -236,42 +235,52 @@ class VBoxAPIHandler(http.server.BaseHTTPRequestHandler):
             self._ok(message=f'Operación puesta en cola. Esperando a que "{vm_name}" se apague de forma segura para aplicar los cambios.')
 
         # POST /vbox/start
-        # Body: {"vm": "nombre", "type": "headless"}  (type opcional, default headless)
+        # Body: {"vms": ["nombre1", "nombre2"], "type": "headless"}  (type opcional, default headless)
         elif path == "/vbox/start":
-            vm_name  = body.get("vm", "").strip()
+            vms      = body.get("vms", [])
             vm_type  = body.get("type", "headless")
 
-            if not vm_name:
-                self._error(400, 'Campo "vm" requerido')
+            if not vms or not isinstance(vms, list):
+                self._error(400, 'Campo "vms" requerido y debe ser una lista')
                 return
             if vm_type not in {"headless", "gui", "separate"}:
                 self._error(400, f'Tipo de inicio inválido: "{vm_type}". Válidos: headless, gui, separate')
                 return
 
-            ok, out = vbox("startvm", sanitize_vm_name(vm_name), "--type", vm_type)
-            if ok:
-                self._ok(message=f'VM "{vm_name}" iniciada en modo {vm_type}')
+            errors = []
+            for vm_name in vms:
+                ok, out = vbox("startvm", sanitize_vm_name(vm_name), "--type", vm_type)
+                if not ok:
+                    errors.append(f"{vm_name}: {out.strip()}")
+            
+            if errors:
+                self._error(500, "Errores iniciando VMs: " + " | ".join(errors))
             else:
-                self._handle_vbox_error(out)
+                self._ok(message=f'{len(vms)} VMs iniciadas en modo {vm_type}')
 
         # POST /vbox/stop
-        # Body: {"vm": "nombre", "mode": "poweroff"}  (mode opcional, default poweroff)
+        # Body: {"vms": ["nombre1", "nombre2"], "mode": "poweroff"}  (mode opcional, default poweroff)
         elif path == "/vbox/stop":
-            vm_name = body.get("vm", "").strip()
-            mode    = body.get("mode", "poweroff")
+            vms  = body.get("vms", [])
+            mode = body.get("mode", "poweroff")
 
-            if not vm_name:
-                self._error(400, 'Campo "vm" requerido')
+            if not vms or not isinstance(vms, list):
+                self._error(400, 'Campo "vms" requerido y debe ser una lista')
                 return
             if mode not in {"poweroff", "acpipowerbutton", "savestate", "pause", "resume"}:
                 self._error(400, f'Modo inválido: "{mode}"')
                 return
 
-            ok, out = vbox("controlvm", sanitize_vm_name(vm_name), mode)
-            if ok:
-                self._ok(message=f'VM "{vm_name}" detenida ({mode})')
+            errors = []
+            for vm_name in vms:
+                ok, out = vbox("controlvm", sanitize_vm_name(vm_name), mode)
+                if not ok:
+                    errors.append(f"{vm_name}: {out.strip()}")
+            
+            if errors:
+                self._error(500, "Errores deteniendo VMs: " + " | ".join(errors))
             else:
-                self._handle_vbox_error(out)
+                self._ok(message=f'{len(vms)} VMs detenidas ({mode})')
 
         # POST /vbox/create-vms
         # Body: {"vms": [...]}
