@@ -88,13 +88,13 @@ def provision_nodes(target_nodes, nodes, host_api_url, skip_boot_order=False):
             print(f"[{YELLOW}!{NC}] No se pudo determinar la IP de '{name}'. Saltando Ansible.")
             continue
 
+        if not skip_boot_order and host_api_url:
+            apply_post_install_specs(host_api_url, node)
+
         playbook_path = _resolve_playbook_path(node_type)
         if not os.path.exists(playbook_path):
             print(f"[{YELLOW}!{NC}] No se encontró playbook en '{playbook_path}'. Saltando Ansible.")
             continue
-
-        if not skip_boot_order and host_api_url:
-            apply_post_install_specs(host_api_url, node)
 
         if _wait_for_ssh(node_ip, name):
             _run_ansible_playbook(playbook_path, node_ip, name)
