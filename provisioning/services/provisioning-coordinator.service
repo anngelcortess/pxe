@@ -1,5 +1,5 @@
 [Unit]
-Description=GAR Config Manager (Ansible Callback Server)
+Description=GAR Provisioning Coordinator (Orchestrator Daemon)
 Documentation=https://github.com/jorgeGimene/gar
 After=network-online.target apache2.service
 Wants=network-online.target
@@ -17,10 +17,10 @@ ExecStart=/usr/bin/python3 /home/admin/gar/provisioner.py listen-callbacks
 Restart=on-failure
 RestartSec=5s
 
-# Logs al journal de systemd (ver con: journalctl -u provision-callback -f)
+# Logs al journal de systemd (ver con: journalctl -u provisioning-coordinator -f)
 StandardOutput=journal
 StandardError=journal
-SyslogIdentifier=provision-callback
+SyslogIdentifier=provisioning-coordinator
 
 [Install]
 WantedBy=multi-user.target

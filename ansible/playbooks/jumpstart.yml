@@ -183,18 +183,19 @@
       register: provisioner_out
       changed_when: false
 
-    - name: "ORQUESTADOR: Copiar config-manager.service"
+    - name: "ORQUESTADOR: Copiar provisioning-coordinator.service"
       copy:
-        src: "{{ repo_dir }}/provisioning/services/config-manager.service"
-        dest: /etc/systemd/system/config-manager.service
-        remote_src: yes
+        src: "{{ repo_dir }}/provisioning/services/provisioning-coordinator.service"
+        dest: /etc/systemd/system/provisioning-coordinator.service
+        owner: root
+        mode: '0644'
 
-    - name: "ORQUESTADOR: Inyectar ruta del repositorio en config-manager.service"
+    - name: "ORQUESTADOR: Inyectar ruta del repositorio en provisioning-coordinator.service"
       replace:
-        path: /etc/systemd/system/config-manager.service
+        path: /etc/systemd/system/provisioning-coordinator.service
         regexp: '/home/admin/gar'
         replace: "{{ repo_dir }}"
-      notify: Recargar e iniciar config-manager
+      notify: Recargar e iniciar provisioning-coordinator
 
     - name: "SISTEMA: Habilitar y arrancar servicios (Apache)"
       service:
@@ -221,9 +222,9 @@
         state: restarted
         enabled: yes
         
-    - name: Recargar e iniciar config-manager
+    - name: Recargar e iniciar provisioning-coordinator
       systemd:
         daemon_reload: yes
-        name: config-manager
+        name: provisioning-coordinator
         state: restarted
         enabled: yes

@@ -44,12 +44,12 @@ def preflight_checks(host_api_url, settings, need_vbox=False, need_callback=Fals
         cb_url = f"http://localhost:{callback_port}/health"
         if not _check_service(cb_url):
             errors.append(
-                f"  {RED}✗{NC} config-manager (Coordinador local)\n"
+                f"  {RED}✗{NC} provisioning-coordinator (Coordinador local)\n"
                 f"    No responde en: {cb_url}\n"
-                f"    → Arranca el servicio: systemctl start config-manager"
+                f"    → Arranca el servicio: systemctl start provisioning-coordinator"
             )
         else:
-            print(f"[{GREEN}✓{NC}] config-manager (Coordinador) — OK")
+            print(f"[{GREEN}✓{NC}] provisioning-coordinator (Coordinador) — OK")
 
     if errors:
         print(f"\n[{RED}-{NC}] Preflight check fallido. Servicios no disponibles:\n")
@@ -154,7 +154,7 @@ def main():
                 print(f"[{GREEN}✓{NC}] {resp_data.get('message', 'Despliegue escalonado iniciado')}")
                 print(f"    El Coordinador Residente gestionará la instalación asíncrona de las VMs.")
                 print(f"    Puedes monitorear el progreso revisando los logs del servicio:")
-                print(f"    {CYAN}journalctl -u config-manager -f{NC}")
+                print(f"    {CYAN}journalctl -u provisioning-coordinator -f{NC}")
         except urllib.error.HTTPError as e:
             err_body = e.read().decode('utf-8', errors='ignore')
             try:
