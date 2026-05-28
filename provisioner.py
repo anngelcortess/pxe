@@ -34,7 +34,7 @@ def preflight_checks(host_api_url, settings, need_vbox=False, need_callback=Fals
             errors.append(
                 f"  {RED}✗{NC} vbox-api (Host)\n"
                 f"    No responde en: {vbox_url}\n"
-                f"    → Arranca el servicio en el Host: ./host_service.sh start"
+                f"    → Arranca el servicio en el Host: ./vbox-api-helper.sh start"
             )
         else:
             print(f"[{GREEN}✓{NC}] vbox-api (Host) — OK")

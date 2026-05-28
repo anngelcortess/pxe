@@ -11,7 +11,7 @@ Para que nuestra orquestación funcione, el script de Python que corre en el Jum
 1. Abre un terminal en la raíz del proyecto en tu máquina física (Host).
 2. Ejecuta el instalador del servicio API de VirtualBox:
    ```bash
-   ./host_service.sh install
+   ./vbox-api-helper.sh install
    ```
 3. Comprueba que está funcionando haciendo una llamada de salud a la API:
    ```bash
@@ -19,7 +19,7 @@ Para que nuestra orquestación funcione, el script de Python que corre en el Jum
    # Debería devolver: {"status": "ok", "message": "VBox API Server is running"}
    ```
 
-*(Opcional: Si quieres ver en tiempo real qué órdenes está recibiendo VirtualBox, puedes abrir otra pestaña de terminal y usar `./host_service.sh logs`).*
+*(Opcional: Si quieres ver en tiempo real qué órdenes está recibiendo VirtualBox, puedes abrir otra pestaña de terminal y usar `./vbox-api-helper.sh logs`).*
 
 ---
 

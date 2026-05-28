@@ -42,7 +42,7 @@ GAR/
 ├── ansible/                       # ⚙️ Fase 2: Configuración de Servicios
 │   └── playbooks/                 # Playbooks y roles de configuración
 ├── provisioner.py                 # 🚀 CLI principal de aprovisionamiento
-├── host_service.sh                # 🛠️ Script instalador para la API del Host
+├── vbox-api-helper.sh             # 🛠️ Script instalador para la API del Host
 ├── AGENTS.md                      # Instrucciones para Agentes de IA
 ├── README.md                      # Este portal de inicio
 └── .gitignore                     # Archivo de ignorados
@@ -57,7 +57,7 @@ Si ya has leído la [Guía de Despliegue](file:///home/Chadry/esi/gyar/trabajo/d
 ### En el Host Anfitrión (Tu PC)
 ```bash
 # Iniciar/Instalar la API de VirtualBox en segundo plano
-./host_service.sh install
+./vbox-api-helper.sh install
 
 # Validar que los archivos YAML no tienen colisiones de IP
 ./provisioner.py validate
