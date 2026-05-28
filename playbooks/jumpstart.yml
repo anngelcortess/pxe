@@ -12,11 +12,6 @@
     - "../config/settings.yml"
 
   tasks:
-    - name: "RED: Desactivar configuración de cloud-init"
-      file:
-        path: /etc/cloud/cloud.cfg.d/99-disable-network-config.cfg
-        state: touch
-      when: false # Se simula con copy en la sig tarea
 
     - name: "RED: Asegurar que cloud-init no gestiona la red"
       copy:
