@@ -89,7 +89,7 @@ def deploy_virtualbox_vms(nodes, host_api_url, vm_dir=None):
     vms_to_process = [n for n in nodes if n.get('name') != 'jumpstart']
     print(f"[{CYAN}*{NC}] Iniciando despliegue masivo (deploy) de {len(vms_to_process)} VMs a través de la API del Host...")
     
-    # Transformando ("masticando") la configuración de los YAMLs
+    # Procesando y adaptando la configuración de los YAMLs al formato de la API
     payload_vms = []
     for node in vms_to_process:
         prov = node.get("provisioning", {})

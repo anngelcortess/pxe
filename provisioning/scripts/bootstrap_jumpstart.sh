@@ -34,7 +34,7 @@ echo -e "-----------------------------------------------------------------------
 
 # Ejecutar el playbook en modo local
 cd "$REPO_DIR"
-ansible-playbook -i localhost, -c local playbooks/jumpstart.yml
+ansible-playbook -i localhost, -c local ansible/playbooks/jumpstart.yml
 
 echo -e "--------------------------------------------------------------------------------"
 echo -e "${GREEN}====================================================${NC}"

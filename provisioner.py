@@ -4,11 +4,11 @@ import sys
 import argparse
 import urllib.request
 
-from gar_orchestrator.parsers import load_all_nodes, load_settings_file
-from gar_orchestrator.validators import validate_nodes
-from gar_orchestrator.baremetal import deploy_virtualbox_vms, undeploy_virtualbox_vms, start_virtualbox_vms, stop_virtualbox_vms, get_existing_vms
-from gar_orchestrator.provisioning import run_callback_server, provision_nodes
-from gar_orchestrator.config_generator import generate_pxe_configs
+from provisioning.orchestrator.parsers import load_all_nodes, load_settings_file
+from provisioning.orchestrator.validators import validate_nodes
+from provisioning.orchestrator.baremetal import deploy_virtualbox_vms, undeploy_virtualbox_vms, start_virtualbox_vms, stop_virtualbox_vms, get_existing_vms
+from provisioning.orchestrator.provisioning import run_callback_server, provision_nodes
+from provisioning.orchestrator.config_generator import generate_pxe_configs
 
 GREEN = '\033[92m'
 YELLOW = '\033[93m'

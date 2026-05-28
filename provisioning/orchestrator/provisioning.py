@@ -7,7 +7,7 @@ import logging
 import threading
 import http.server
 import urllib.parse
-from gar_orchestrator.baremetal import apply_post_install_specs
+from provisioning.orchestrator.baremetal import apply_post_install_specs
 
 GREEN = '\033[92m'
 YELLOW = '\033[93m'
@@ -25,8 +25,8 @@ log = logging.getLogger('provisioning')
 def _resolve_playbook_path(node_type, templates_dir=None):
     """Resuelve la ruta del playbook Ansible correspondiente al tipo de nodo."""
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    repo_root = os.path.dirname(script_dir)
-    playbooks_dir = os.path.join(repo_root, 'playbooks')
+    repo_root = os.path.dirname(os.path.dirname(script_dir))
+    playbooks_dir = os.path.join(repo_root, 'ansible', 'playbooks')
 
     playbook_path = os.path.join(playbooks_dir, f'{node_type}.yml')
     if not os.path.exists(playbook_path):

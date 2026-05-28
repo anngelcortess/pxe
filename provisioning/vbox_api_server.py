@@ -30,10 +30,10 @@ from urllib.parse import urlparse, parse_qs
 import threading
 import time
 
-from gar_orchestrator.parsers import load_settings_file
+from provisioning.orchestrator.parsers import load_settings_file
 
 # ── Configuración por defecto ──────────────────────────────────────────────────
-base_dir = os.path.dirname(os.path.abspath(__file__))
+base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 settings = load_settings_file(os.path.join(base_dir, "config", "settings.yml"))
 
 DEFAULT_PORT = settings.get('host_api', {}).get('port', 7070)

@@ -1,7 +1,7 @@
 import os
 import subprocess
 import jinja2
-from gar_orchestrator.parsers import load_networks_file, load_settings_file
+from provisioning.orchestrator.parsers import load_networks_file, load_settings_file
 
 GREEN = '\033[92m'
 YELLOW = '\033[93m'
@@ -145,17 +145,19 @@ def generate_pxe_configs(nodes, templates_dir=None):
     """Punto de entrada principal. Coordina la generación de todas las configuraciones."""
     print("[*] Iniciando generación de configuraciones de red y aprovisionamiento...")
     
-    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    provisioning_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    repo_root = os.path.dirname(provisioning_dir)
+    
     if templates_dir is None:
-        templates_dir = os.path.join(base_dir, "templates")
+        templates_dir = os.path.join(provisioning_dir, "templates")
         
-    settings = load_settings_file(os.path.join(base_dir, "config", "settings.yml"))
+    settings = load_settings_file(os.path.join(repo_root, "config", "settings.yml"))
     jumpstart_user = settings.get('jumpstart', {}).get('ssh_user', 'admin')
     
     ssh_key = get_jumpstart_pubkey(jumpstart_user)
-    networks_list = load_networks_file(os.path.join(base_dir, "config", "networks.yml"))
+    networks_list = load_networks_file(os.path.join(repo_root, "config", "networks.yml"))
     
-    dhcp_config_path, tftp_pxe_dir, web_autoinstall_dir, is_live_server = _setup_target_paths(base_dir)
+    dhcp_config_path, tftp_pxe_dir, web_autoinstall_dir, is_live_server = _setup_target_paths(provisioning_dir)
     
     # Configurar entorno Jinja2
     jinja_env = _get_jinja_env(templates_dir)
