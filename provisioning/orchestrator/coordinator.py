@@ -16,7 +16,7 @@ class DeploymentState:
         self.pending_nodes = []
         self.in_progress_nodes = []
         self.completed_nodes = []
-        self.is_deploying = False
+        self.status = "IDLE"  # Posibles estados: IDLE, PXE_INSTALLING, ANSIBLE_PROVISIONING
         self.lock = threading.Lock()
 
 state = DeploymentState()
@@ -52,6 +52,7 @@ class CoordinatorHandler(http.server.BaseHTTPRequestHandler):
             log.info(f"Callback recibido de PXE: '{safe_name}'")
             self._respond(200, '{"status": "ok"}')
             
+            # Lanzamos el proceso del evento en background para no bloquear el HTTP Server
             threading.Thread(target=process_node_ready, args=(safe_name,), daemon=True).start()
             return
 
@@ -74,63 +75,122 @@ class CoordinatorHandler(http.server.BaseHTTPRequestHandler):
                 self._respond(400, '{"error": "No VMs provided"}')
                 return
             
-            threading.Thread(target=start_batch_deployment, args=(vms,), daemon=True).start()
-            self._respond(200, '{"status": "ok", "message": "Deployment initiated in background"}')
+            success, message = start_batch_deployment(vms)
+            if success:
+                self._respond(200, json.dumps({"status": "ok", "message": message}))
+            else:
+                self._respond(409, json.dumps({"error": message}))
             return
 
         self._respond(404, '{"error": "not found"}')
 
 def start_batch_deployment(vms):
-    with state.lock:
-        state.pending_nodes = [n for n in vms if n.get('name') != 'jumpstart']
-        state.in_progress_nodes = []
-        state.completed_nodes = []
-        state.is_deploying = True
-        
-        to_start = state.pending_nodes[:state.batch_size]
-        state.pending_nodes = state.pending_nodes[state.batch_size:]
-        state.in_progress_nodes.extend(to_start)
+    """
+    Recibe una lista de VMs desde el CLI.
+    Si la cola está inactiva, la inicializa.
+    Si está instalando por PXE, añade a la cola dinámicamente evitando duplicados.
+    Si está en fase final (Ansible), rechaza la petición.
+    """
+    to_start = []
     
-    log.info(f"Iniciando despliegue. Batch inicial de {len(to_start)} VMs.")
-    create_vms(to_start, host_api_global)
+    with state.lock:
+        if state.status == "ANSIBLE_PROVISIONING":
+            return False, "El clúster ya está en la fase final de configuración de Ansible. Espera a que termine para añadir más máquinas."
+            
+        new_nodes = [n for n in vms if n.get('name') != 'jumpstart']
+        added_count = 0
+        
+        if state.status == "IDLE":
+            state.pending_nodes = new_nodes
+            state.in_progress_nodes = []
+            state.completed_nodes = []
+            state.status = "PXE_INSTALLING"
+            
+            # Extraer el primer bloque
+            to_start = state.pending_nodes[:state.batch_size]
+            state.pending_nodes = state.pending_nodes[state.batch_size:]
+            state.in_progress_nodes.extend(to_start)
+            added_count = len(new_nodes)
+        else:
+            # state.status es PXE_INSTALLING, añadimos de forma inteligente a la cola
+            for node in new_nodes:
+                name = node.get('name')
+                in_pending = any(n.get('name') == name for n in state.pending_nodes)
+                in_progress = any(n.get('name') == name for n in state.in_progress_nodes)
+                
+                if not in_pending and not in_progress:
+                    # Sacamos de completados por si el usuario está forzando una reinstalación
+                    state.completed_nodes = [n for n in state.completed_nodes if n.get('name') != name]
+                    state.pending_nodes.append(node)
+                    added_count += 1
+            
+            # Si hay "huecos" en la ventana deslizante, aprovechamos para rellenarlos al instante
+            while len(state.in_progress_nodes) < state.batch_size and state.pending_nodes:
+                next_node = state.pending_nodes.pop(0)
+                state.in_progress_nodes.append(next_node)
+                to_start.append(next_node)
+                
+    # Las llamadas de red a la Host API siempre fuera del lock de memoria
+    if to_start:
+        log.info(f"Enviando {len(to_start)} VMs a la API del Host (Fase PXE).")
+        create_vms(to_start, host_api_global)
+        
+    return True, f"Añadidos {added_count} nodos a la cola de despliegue."
 
 def process_node_ready(node_name):
+    """
+    Lógica de la Ventana Deslizante desencadenada por un callback.
+    """
+    to_start = None
+    all_done = False
+    
     with state.lock:
-        node = next((n for n in state.in_progress_nodes if n.get('name') == node_name), None)
-        if not node:
-            log.warning(f"Nodo {node_name} no encontrado en in_progress_nodes.")
-            # Intento de fallback por si acaso se reinició el servidor de callbacks
-            # o si el comando provision_nodes individual saltó aquí
+        if state.status != "PXE_INSTALLING":
+            log.warning(f"Se recibió callback para {node_name} pero el estado global es {state.status}.")
             return
             
-        # Reconfigurar boot y bajar RAM a 1024
+        node = next((n for n in state.in_progress_nodes if n.get('name') == node_name), None)
+        if not node:
+            log.warning(f"Nodo {node_name} no encontrado en in_progress_nodes (¿Evento duplicado o cancelado?).")
+            return
+            
+        # 1. Reconfigurar boot y bajar RAM
         apply_post_install_specs(host_api_global, node)
         
+        # 2. Desplazar nodo
         state.in_progress_nodes.remove(node)
         state.completed_nodes.append(node)
         
-        log.info(f"Nodo {node_name} completado y reconfigurado. Quedan {len(state.pending_nodes)} en cola.")
+        log.info(f"Nodo {node_name} completado. Quedan {len(state.pending_nodes)} en cola.")
         
+        # 3. Avanzar ventana
         if state.pending_nodes:
             next_node = state.pending_nodes.pop(0)
             state.in_progress_nodes.append(next_node)
-            log.info(f"Lanzando siguiente nodo en la ventana deslizante: {next_node.get('name')}")
-            node_to_start = next_node
+            log.info(f"Avanzando ventana deslizante con nodo: {next_node.get('name')}")
+            to_start = next_node
         else:
-            node_to_start = None
-            
-        all_done = (len(state.pending_nodes) == 0 and len(state.in_progress_nodes) == 0)
+            if len(state.in_progress_nodes) == 0:
+                all_done = True
+                state.status = "ANSIBLE_PROVISIONING"
 
-    if node_to_start:
-        create_vms([node_to_start], host_api_global)
+    if to_start:
+        create_vms([to_start], host_api_global)
         
     if all_done:
-        log.info("¡PXE finalizado para todas las máquinas! Iniciando encendido global y Ansible.")
-        start_virtualbox_vms(state.completed_nodes, host_api_global, vm_type="headless")
-        provision_all_nodes(state.completed_nodes)
+        log.info("¡PXE finalizado para todas las máquinas! Iniciando encendido global y ejecución de Ansible.")
         
+        # Usamos una copia de los nodos para no retener la referencia mutable
+        nodes_to_provision = list(state.completed_nodes)
+        
+        start_virtualbox_vms(nodes_to_provision, host_api_global, vm_type="headless")
+        provision_all_nodes(nodes_to_provision)
+        
+        # Al terminar todo el bloque de Ansible (que puede tardar minutos), reiniciamos el estado
         with state.lock:
-            state.is_deploying = False
+            state.status = "IDLE"
+            state.completed_nodes = []
+            log.info("Despliegue global finalizado. Orquestador vuelve a estado IDLE.")
 
 def run_callback_server(nodes, host_api_url, port=8081):
     global host_api_global

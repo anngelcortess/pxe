@@ -150,10 +150,19 @@ def main():
         req.add_header('Content-Length', str(len(payload)))
         try:
             with urllib.request.urlopen(req) as response:
-                print(f"[{GREEN}✓{NC}] ¡Despliegue escalonado iniciado!")
+                resp_data = json.loads(response.read().decode('utf-8'))
+                print(f"[{GREEN}✓{NC}] {resp_data.get('message', 'Despliegue escalonado iniciado')}")
                 print(f"    El Coordinador Residente gestionará la instalación asíncrona de las VMs.")
                 print(f"    Puedes monitorear el progreso revisando los logs del servicio:")
                 print(f"    {CYAN}journalctl -u config-manager -f{NC}")
+        except urllib.error.HTTPError as e:
+            err_body = e.read().decode('utf-8', errors='ignore')
+            try:
+                err_json = json.loads(err_body)
+                print(f"[{YELLOW}!{NC}] Coordinador: {err_json.get('error', err_body)}")
+            except json.JSONDecodeError:
+                print(f"[{RED}!{NC}] Error HTTP {e.code} contactando con el Coordinador.")
+            sys.exit(1)
         except Exception as e:
             print(f"[{RED}!{NC}] Error contactando con el Coordinador local en {url}: {e}")
             sys.exit(1)
