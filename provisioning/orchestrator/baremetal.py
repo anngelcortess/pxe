@@ -59,7 +59,7 @@ def _make_api_request(api_url, path, payload_dict):
 def apply_post_install_specs(host_api_url, node):
     """Cambia el orden de arranque a disco y aplica la memoria/cpu final de producción."""
     name = node.get("name")
-    specs = node.get("vbox_specs", {})
+    specs = node.get("production_specs", {})
     print(f"[*] Aplicando orden de arranque y recursos finales a '{name}'...")
     result = _make_api_request(host_api_url, "/vbox/set-boot-order", {
         "vm": name,
@@ -77,8 +77,8 @@ def create_vms(nodes, host_api_url):
     """Prepara la configuración y pide a VirtualBox que cree las VMs."""
     payload_vms = []
     for node in nodes:
-        prov = node.get("provisioning", {})
-        specs = node.get("vbox_specs", {})
+        prov = node.get("pxe_specs", {})
+        specs = node.get("production_specs", {})
         networks = node.get("networks", [])
         if networks and node.get("mac"):
             networks[0]["mac"] = node.get("mac")

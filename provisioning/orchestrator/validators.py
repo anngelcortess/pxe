@@ -60,9 +60,9 @@ def validate_nodes(nodes):
                 ips[ip_key] = name
 
         # Validar especificaciones VirtualBox
-        specs = node.get('vbox_specs', {})
+        specs = node.get('production_specs', {})
         if not specs:
-            print(f"[!] Warning [{name}]: Sin especificaciones de hardware vbox_specs.")
+            print(f"[!] Warning [{name}]: Sin especificaciones de hardware production_specs.")
             warnings += 1
             
     print(f"\n[*] Validación finalizada: {errors} errores, {warnings} advertencias.")

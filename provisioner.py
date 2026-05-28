@@ -142,7 +142,7 @@ def main():
                 sys.exit(1)
                 
         # Enviar al coordinador central
-        callback_port = settings.get('jumpstart', {}).get('callback_port', 8081)
+        callback_port = settings.get('orchestrator', {}).get('port', 8081)
         url = f"http://127.0.0.1:{callback_port}/start-batch-deploy"
         payload = json.dumps({"vms": deploy_nodes}).encode('utf-8')
         req = urllib.request.Request(url, data=payload, method="POST")
@@ -203,8 +203,8 @@ def main():
         provision_all_nodes(target_nodes)
 
     elif args.action == 'listen-callbacks':
-        port = args.port if args.port else settings.get('jumpstart', {}).get('callback_port', 8081)
-        batch_size = settings.get('jumpstart', {}).get('batch_size', 3)
+        port = args.port if args.port else settings.get('orchestrator', {}).get('port', 8081)
+        batch_size = settings.get('orchestrator', {}).get('batch_size', 3)
         run_callback_server(nodes, host_api_url, port=port, batch_size=batch_size)
 
 if __name__ == '__main__':
