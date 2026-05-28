@@ -47,14 +47,19 @@ case "${1:-}" in
         systemctl status "${SERVICE_NAME}" || true
         ;;
     logs)
-        echo "[*] Mostrando logs en tiempo real del Orquestador (Ctrl+C para salir)..."
-        journalctl -u "${SERVICE_NAME}" -f
+        if [[ "${2:-}" == "-f" ]]; then
+            echo "[*] Mostrando logs en tiempo real del Orquestador (Ctrl+C para salir)..."
+            journalctl -u "${SERVICE_NAME}" -f
+        else
+            echo "[*] Mostrando logs estáticos del Orquestador..."
+            journalctl -u "${SERVICE_NAME}" --no-pager
+        fi
         ;;
     *)
         echo "========================================================"
         echo "  Controlador del Orquestador de GAR (Jumpstart)        "
         echo "========================================================"
-        echo "Uso: $0 {install|uninstall|start|stop|restart|status|logs}"
+        echo "Uso: $0 {install|uninstall|start|stop|restart|status|logs [-f]}"
         echo ""
         echo "Nota: El comando install crea los enlaces en /etc/systemd/system"
         exit 1

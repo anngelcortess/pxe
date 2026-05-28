@@ -43,11 +43,16 @@ case "${1:-}" in
         systemctl --user status "${SERVICE_NAME}"
         ;;
     logs)
-        echo "[*] Mostrando logs en tiempo real (Ctrl+C para salir)..."
-        journalctl --user -u "${SERVICE_NAME}" -f
+        if [[ "${2:-}" == "-f" ]]; then
+            echo "[*] Mostrando logs en tiempo real (Ctrl+C para salir)..."
+            journalctl --user -u "${SERVICE_NAME}" -f
+        else
+            echo "[*] Mostrando logs estáticos..."
+            journalctl --user -u "${SERVICE_NAME}" --no-pager
+        fi
         ;;
     *)
-        echo "Uso: $0 {install|uninstall|start|stop|restart|status|logs}"
+        echo "Uso: $0 {install|uninstall|start|stop|restart|status|logs [-f]}"
         exit 1
         ;;
 esac
