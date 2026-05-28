@@ -1,0 +1,28 @@
+---
+# ============================================================
+# Rol: loadbalancer — Generación de certificado SSL autofirmado
+# Incluido desde tasks/main.yml
+# ============================================================
+
+- name: "SSL: Instalar openssl"
+  apt:
+    name: openssl
+    state: present
+
+- name: "SSL: Crear directorio para certificados"
+  file:
+    path: /etc/nginx/ssl
+    state: directory
+    owner: root
+    group: root
+    mode: '0700'
+
+- name: "SSL: Generar clave privada y certificado autofirmado (válido 3 años)"
+  command: >
+    openssl req -x509 -nodes -days 1095
+    -newkey rsa:2048
+    -keyout /etc/nginx/ssl/lb-selfsigned.key
+    -out    /etc/nginx/ssl/lb-selfsigned.crt
+    -subj "/C=ES/ST=Madrid/L=Madrid/O=FakeEnterprise/CN=load-balancer"
+  args:
+    creates: /etc/nginx/ssl/lb-selfsigned.crt

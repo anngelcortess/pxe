@@ -1,0 +1,64 @@
+# ==============================================================
+# Nginx — Balanceador de carga HTTP/HTTPS
+# Generado por Ansible · Rol: loadbalancer
+# Nodo: load-balancer ({{ ansible_host }})
+# ==============================================================
+
+# --- Upstream: pool de servidores web ---
+upstream cms_backends {
+    # Algoritmo round-robin (por defecto en Nginx).
+    # Cuando el Rol 2 añada los frontales, estos son los nodos destino.
+{% for backend in lb_backends %}
+    server {{ backend.ip }}:{{ backend.port }};   # {{ backend.name }}
+{% endfor %}
+}
+
+# --- Servidor HTTP (puerto 80) ---
+server {
+    listen {{ lb_http_port }};
+    server_name _;
+
+    # Redirige todo el tráfico HTTP a HTTPS (Req. 6)
+    return 301 https://$host$request_uri;
+}
+
+# --- Servidor HTTPS (puerto 443) ---
+server {
+    listen {{ lb_https_port }} ssl;
+    server_name _;
+
+    # -------------------------------------------------------
+    # Certificado SSL autofirmado.
+    # En producción sustituir por un certificado real (Let's Encrypt, etc.)
+    # -------------------------------------------------------
+    ssl_certificate     /etc/nginx/ssl/lb-selfsigned.crt;
+    ssl_certificate_key /etc/nginx/ssl/lb-selfsigned.key;
+
+    ssl_protocols       TLSv1.2 TLSv1.3;
+    ssl_ciphers         HIGH:!aNULL:!MD5;
+
+    # -------------------------------------------------------
+    # Proxy hacia el upstream de backends
+    # -------------------------------------------------------
+    location / {
+        proxy_pass         http://cms_backends;
+        proxy_http_version 1.1;
+
+        # Cabeceras necesarias para que el CMS sepa la IP real del cliente
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Real-IP         $remote_addr;
+        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto $scheme;
+
+        # Timeouts razonables
+        proxy_connect_timeout 10s;
+        proxy_read_timeout    60s;
+    }
+
+    # Página de error personalizada si ambos backends caen
+    error_page 502 503 504 /50x.html;
+    location = /50x.html {
+        root /var/www/html;
+        internal;
+    }
+}

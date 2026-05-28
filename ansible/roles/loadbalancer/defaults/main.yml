@@ -1,0 +1,25 @@
+---
+# ============================================================
+# Rol: loadbalancer — Variables por defecto
+# Nodo:  load-balancer (192.168.1.10)
+# ============================================================
+
+# Interfaces de red del nodo
+lb_iface_main: "enp0s3"   # NIC conectada a intnet_main (192.168.1.0/24)
+lb_iface_nat:  "enp0s8"   # NIC NAT (salida a internet)
+
+# IPs de los frontales web (Req. 4a)
+lb_backends:
+  - name: web-frontend-1
+    ip:   "192.168.1.11"
+    port: 80
+  - name: web-frontend-2
+    ip:   "192.168.1.12"
+    port: 80
+
+# Puertos que Nginx expone al exterior
+lb_http_port:  80
+lb_https_port: 443
+
+# Subred main (para las reglas de NAT y UFW)
+lb_main_subnet: "192.168.1.0/24"

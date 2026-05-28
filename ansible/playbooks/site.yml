@@ -1,0 +1,51 @@
+---
+# ==============================================================
+# GAR — Fase 2: Configuración de Servicios
+# Playbook principal: llama a cada rol sobre sus nodos.
+#
+# Uso:
+#   ansible-playbook -i inventory/hosts.yml site.yml
+#
+# Para ejecutar solo un rol:
+#   ansible-playbook -i inventory/hosts.yml site.yml --tags loadbalancer
+# ==============================================================
+
+# ── Rol 1: Network & Edge Security ────────────────────────────
+- name: "Rol 1 — Load Balancer (Nginx + NAT + UFW)"
+  hosts: load_balancer
+  become: yes
+  roles:
+    - role: loadbalancer
+  tags: loadbalancer
+
+# ── Rol 2: Web Layer & CMS ────────────────────────────────────
+- name: "Rol 2 — Web Frontends (Nginx + CMS)"
+  hosts: web_frontends
+  become: yes
+  roles:
+    - role: cms          # pendiente — Rol 2
+  tags: cms
+
+# ── Rol 3: Clustering & Database HA ───────────────────────────
+- name: "Rol 3 — Docker Swarm + Base de datos HA"
+  hosts: cluster
+  become: yes
+  roles:
+    - role: swarm        # pendiente — Rol 3
+  tags: swarm
+
+# ── Rol 4: Storage & Redundancy ───────────────────────────────
+- name: "Rol 4 — Almacenamiento compartido (GlusterFS)"
+  hosts: storage
+  become: yes
+  roles:
+    - role: storage      # pendiente — Rol 4
+  tags: storage
+
+# ── Rol 5: Observability & Hotdesks ───────────────────────────
+- name: "Rol 5 — Monitorización (CheckMK + SNMP) y Hotdesks"
+  hosts: monitoring, hotdesks
+  become: yes
+  roles:
+    - role: monitoring   # pendiente — Rol 5
+  tags: monitoring

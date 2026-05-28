@@ -1,0 +1,12 @@
+---
+# ============================================================
+# Rol: loadbalancer — Handlers
+# ============================================================
+
+- name: Recargar Nginx
+  service:
+    name: nginx
+    state: reloaded
+
+- name: Guardar reglas de iptables
+  command: netfilter-persistent save

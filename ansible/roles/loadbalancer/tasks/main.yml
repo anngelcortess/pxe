@@ -1,0 +1,139 @@
+---
+# ============================================================
+# Rol: loadbalancer — Tareas
+# Requisitos cubiertos: 4a, 6, 7, 9, 14
+# ============================================================
+
+# ------------------------------------------------------------------
+# BLOQUE 1: NAT / ROUTER
+# El load-balancer tiene una NIC en intnet_main y otra NIC NAT.
+# Actúa como pasarela a internet para toda la red main (Req. 7 y 14).
+# ------------------------------------------------------------------
+
+- name: "NAT: Habilitar IP Forwarding de forma persistente"
+  sysctl:
+    name: net.ipv4.ip_forward
+    value: '1'
+    sysctl_set: yes
+    state: present
+    reload: yes
+
+- name: "NAT: Instalar iptables-persistent para sobrevivir reinicios"
+  apt:
+    name: iptables-persistent
+    state: present
+    update_cache: yes
+  environment:
+    DEBIAN_FRONTEND: noninteractive
+
+- name: "NAT: Regla MASQUERADE — enmascarar tráfico de main hacia internet"
+  iptables:
+    table: nat
+    chain: POSTROUTING
+    source: "{{ lb_main_subnet }}"
+    out_interface: "{{ lb_iface_nat }}"
+    jump: MASQUERADE
+  notify: Guardar reglas de iptables
+
+- name: "NAT: Permitir FORWARD de main hacia internet"
+  iptables:
+    chain: FORWARD
+    in_interface: "{{ lb_iface_main }}"
+    out_interface: "{{ lb_iface_nat }}"
+    jump: ACCEPT
+  notify: Guardar reglas de iptables
+
+- name: "NAT: Permitir tráfico de retorno (ESTABLISHED/RELATED)"
+  iptables:
+    chain: FORWARD
+    ctstate: ESTABLISHED,RELATED
+    jump: ACCEPT
+  notify: Guardar reglas de iptables
+
+# ------------------------------------------------------------------
+# BLOQUE 2: NGINX — Balanceador de carga HTTP/HTTPS (Req. 4a y 6)
+# ------------------------------------------------------------------
+
+- name: "SSL: Generar certificado autofirmado"
+  import_tasks: ssl.yml
+
+- name: "NGINX: Instalar nginx"
+  apt:
+    name: nginx
+    state: present
+    update_cache: yes
+
+- name: "NGINX: Asegurar que el directorio de sites-available existe"
+  file:
+    path: /etc/nginx/sites-available
+    state: directory
+    mode: '0755'
+
+- name: "NGINX: Desplegar configuración del balanceador desde plantilla"
+  template:
+    src: nginx_lb.conf.j2
+    dest: /etc/nginx/sites-available/loadbalancer.conf
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Recargar Nginx
+
+- name: "NGINX: Activar el sitio del balanceador (enlace simbólico)"
+  file:
+    src:  /etc/nginx/sites-available/loadbalancer.conf
+    dest: /etc/nginx/sites-enabled/loadbalancer.conf
+    state: link
+  notify: Recargar Nginx
+
+- name: "NGINX: Eliminar el sitio 'default' para evitar conflictos"
+  file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+  notify: Recargar Nginx
+
+- name: "NGINX: Habilitar y arrancar el servicio"
+  service:
+    name: nginx
+    state: started
+    enabled: yes
+
+# ------------------------------------------------------------------
+# BLOQUE 3: UFW — Firewall (Req. 6 y 9)
+# Política: denegar todo el tráfico entrante externo excepto 80, 443
+# y 22 (SSH para administración).
+# ------------------------------------------------------------------
+
+- name: "UFW: Instalar ufw"
+  apt:
+    name: ufw
+    state: present
+
+- name: "UFW: Política por defecto — denegar entradas, permitir salidas"
+  ufw:
+    direction: "{{ item.direction }}"
+    policy:    "{{ item.policy }}"
+  loop:
+    - { direction: incoming, policy: deny  }
+    - { direction: outgoing, policy: allow }
+
+- name: "UFW: Abrir puerto SSH (administración)"
+  ufw:
+    rule: allow
+    port: '22'
+    proto: tcp
+
+- name: "UFW: Abrir puerto HTTP ({{ lb_http_port }})"
+  ufw:
+    rule: allow
+    port: "{{ lb_http_port | string }}"
+    proto: tcp
+
+- name: "UFW: Abrir puerto HTTPS ({{ lb_https_port }})"
+  ufw:
+    rule: allow
+    port: "{{ lb_https_port | string }}"
+    proto: tcp
+
+- name: "UFW: Habilitar el firewall"
+  ufw:
+    state: enabled
