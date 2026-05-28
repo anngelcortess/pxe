@@ -193,7 +193,7 @@
     - name: "ORQUESTADOR: Inyectar ruta del repositorio en provisioning-coordinator.service"
       replace:
         path: /etc/systemd/system/provisioning-coordinator.service
-        regexp: '/home/admin/gar'
+        regexp: '__REPO_DIR__'
         replace: "{{ repo_dir }}"
       notify: Recargar e iniciar provisioning-coordinator
 

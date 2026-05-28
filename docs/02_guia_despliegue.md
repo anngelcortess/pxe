@@ -29,8 +29,6 @@ El Jumpstart es el corazón de nuestra red. Es la única máquina que habremos c
 
 1. Arranca tu VM Jumpstart desde la interfaz de VirtualBox.
 2. Sube la carpeta de este proyecto a la VM (usando `git clone`, carpetas compartidas de VBox o `scp`).
-   > [!IMPORTANT]
-   > Si usas `scp` o un ZIP, asegúrate de que la carpeta resultante en la máquina virtual se llame **obligatoriamente `gar`** (ej. `/home/admin/gar`), ya que los servicios de Ansible la buscarán en esa ruta exacta. Lo más sencillo es clonar directamente el repositorio: `git clone git@github.com:jorgeGimene/gar.git`.
 3. Entra a la VM por SSH o consola gráfica, sitúate en la raíz del proyecto y ejecuta:
    ```bash
    sudo ./provisioning/scripts/bootstrap_jumpstart.sh

@@ -10,8 +10,8 @@ Type=simple
 User=root
 Group=root
 
-# Ruta al script de callback — ajustar si el repositorio está en otra ubicación
-ExecStart=/usr/bin/python3 /home/admin/gar/provisioner.py listen-callbacks
+# Ruta al script de callback — se inyecta dinámicamente mediante Ansible
+ExecStart=/usr/bin/python3 __REPO_DIR__/provisioner.py listen-callbacks
 
 # Reiniciar si el proceso muere inesperadamente
 Restart=on-failure
