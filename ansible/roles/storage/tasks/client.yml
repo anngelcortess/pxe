@@ -1,0 +1,26 @@
+---
+# ansible/roles/storage/tasks/client.yml
+
+- name: Instalar cliente GlusterFS
+  apt:
+    name: glusterfs-client
+    state: present
+    update_cache: yes
+
+- name: Crear punto de montaje para el CMS
+  file:
+    # Esta es la ruta donde los servidores web verán los archivos compartidos.
+    path: /var/www/cms_shared
+    state: directory
+    mode: '0775'
+    owner: www-data
+    group: www-data
+
+- name: Montar el volumen GlusterFS en los frontales
+  mount:
+    path: /var/www/cms_shared
+    # Usamos la IP de tu storage-node del inventario
+    src: "192.168.2.20:/gv0"
+    fstype: glusterfs
+    opts: defaults,_netdev
+    state: mounted
