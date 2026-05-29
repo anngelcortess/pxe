@@ -6,18 +6,34 @@ import argparse
 import urllib.request
 import urllib.error
 
-from provisioning.orchestrator.parsers import load_all_nodes, load_settings_file
-from provisioning.orchestrator.validators import validate_nodes
-from provisioning.orchestrator.baremetal import undeploy_virtualbox_vms, start_virtualbox_vms, stop_virtualbox_vms, get_existing_vms
-from provisioning.orchestrator.coordinator import run_callback_server
-from provisioning.orchestrator.config_generator import generate_pxe_configs
-from provisioning.orchestrator.ansible_runner import provision_all_nodes
+from provisioning.jumpstart.parsers import load_all_nodes, load_settings_file
+from provisioning.jumpstart.validators import validate_nodes
+from provisioning.jumpstart.baremetal import undeploy_virtualbox_vms, start_virtualbox_vms, stop_virtualbox_vms, get_existing_vms
+from provisioning.jumpstart.config_generator import generate_pxe_configs
+from provisioning.jumpstart.software_provisioner import provision_all_nodes
 
 GREEN = '\033[92m'
 YELLOW = '\033[93m'
 CYAN = '\033[96m'
 RED = '\033[91m'
 NC = '\033[0m'
+
+def _load_nodes_file(filepath):
+    """Lee un fichero de nodos (uno por línea, # para comentarios) y devuelve una lista de nombres."""
+    if not os.path.isfile(filepath):
+        print(f"[{RED}-{NC}] Error: El fichero de nodos '{filepath}' no existe.")
+        sys.exit(1)
+    names = []
+    with open(filepath) as f:
+        for line in f:
+            name = line.split('#')[0].strip()
+            if name:
+                names.append(name)
+    if not names:
+        print(f"[{RED}-{NC}] Error: El fichero '{filepath}' no contiene ningún nodo.")
+        sys.exit(1)
+    return names
+
 
 def _check_service(url, timeout=5):
     try:
@@ -70,8 +86,7 @@ def main():
     parent_parser.add_argument('--nodes-dir', default=default_nodes_dir, help=f"Directorio con archivos YAML de nodos")
     parent_parser.add_argument('--templates-dir', default=default_templates_dir, help=f"Directorio con plantillas Autoinstall")
     parent_parser.add_argument('--vm-dir', default="/home/Chadry/VirtualBox VMs", help="Ruta base para los discos virtuales en el host")
-
-    parser_validate = subparsers.add_parser('validate', parents=[parent_parser], help="Validar la sintaxis y reglas de los YAMLs de la maqueta")
+    parent_parser.add_argument('--nodes-file', metavar='FICHERO', default=None, help="Fichero de texto con los nodos a operar (uno por línea, # para comentarios)")
 
     parser_deploy = subparsers.add_parser('deploy', parents=[parent_parser], help="Desplegar las VMs en VirtualBox a partir de la maqueta")
     parser_deploy.add_argument('node', nargs='?', help="Nombre de un nodo específico para desplegar (opcional, por defecto todos)")
@@ -83,9 +98,6 @@ def main():
 
     parser_provision = subparsers.add_parser('provision', parents=[parent_parser], help="Aprovisionar software (Ansible) en las VMs de forma directa")
     parser_provision.add_argument('node', nargs='*', help="Nombres de los nodos a aprovisionar (opcional, por defecto todos)")
-
-    parser_listen = subparsers.add_parser('listen-callbacks', parents=[parent_parser], help=argparse.SUPPRESS)
-    parser_listen.add_argument('--port', type=int, default=None, help=argparse.SUPPRESS)
 
     parser_start = subparsers.add_parser('start', parents=[parent_parser], help="Iniciar las VMs en VirtualBox (excepto jumpstart)")
     parser_start.add_argument('node', nargs='?', help="Nombre de un nodo específico para iniciar (opcional, por defecto todos)")
@@ -108,11 +120,7 @@ def main():
     host_api_port = settings.get('host_api', {}).get('port', 7070)
     host_api_url = f"http://{host_api_ip}:{host_api_port}"
     
-    if args.action == 'validate':
-        success = validate_nodes(nodes)
-        sys.exit(0 if success else 1)
-        
-    elif args.action == 'deploy':
+    if args.action == 'deploy':
         if not validate_nodes(nodes):
             print("[-] Error de validación en los YAML. Abortando despliegue.")
             sys.exit(1)
@@ -135,7 +143,16 @@ def main():
         generate_pxe_configs(nodes, args.templates_dir)
             
         deploy_nodes = nodes
-        if args.node:
+        if args.node and args.nodes_file:
+            print(f"[{RED}-{NC}] Error: No puedes usar 'node' y '--nodes-file' a la vez.")
+            sys.exit(1)
+        elif args.nodes_file:
+            filter_names = _load_nodes_file(args.nodes_file)
+            deploy_nodes = [n for n in nodes if n.get('name') in filter_names]
+            not_found = [name for name in filter_names if name not in [n.get('name') for n in nodes]]
+            if not_found:
+                print(f"[{YELLOW}!{NC}] Nodos del fichero no encontrados en los YAMLs: {', '.join(not_found)}")
+        elif args.node:
             deploy_nodes = [n for n in nodes if n.get('name') == args.node]
             if not deploy_nodes:
                 print(f"[-] Error: El nodo '{args.node}' no está definido en los archivos YAML.")
@@ -173,7 +190,13 @@ def main():
         preflight_checks(host_api_url, settings, need_vbox=True)
             
         undeploy_nodes = nodes
-        if args.node:
+        if args.node and args.nodes_file:
+            print(f"[{RED}-{NC}] Error: No puedes usar 'node' y '--nodes-file' a la vez.")
+            sys.exit(1)
+        elif args.nodes_file:
+            filter_names = _load_nodes_file(args.nodes_file)
+            undeploy_nodes = [n for n in nodes if n.get('name') in filter_names]
+        elif args.node:
             undeploy_nodes = [n for n in nodes if n.get('name') == args.node]
         undeploy_virtualbox_vms(undeploy_nodes, host_api_url)
         
@@ -185,14 +208,26 @@ def main():
     elif args.action == 'start':
         preflight_checks(host_api_url, settings, need_vbox=True)
         start_nodes = nodes
-        if args.node:
+        if args.node and args.nodes_file:
+            print(f"[{RED}-{NC}] Error: No puedes usar 'node' y '--nodes-file' a la vez.")
+            sys.exit(1)
+        elif args.nodes_file:
+            filter_names = _load_nodes_file(args.nodes_file)
+            start_nodes = [n for n in nodes if n.get('name') in filter_names]
+        elif args.node:
             start_nodes = [n for n in nodes if n.get('name') == args.node]
         start_virtualbox_vms(start_nodes, host_api_url, args.type)
 
     elif args.action == 'stop':
         preflight_checks(host_api_url, settings, need_vbox=True)
         stop_nodes = nodes
-        if args.node:
+        if args.node and args.nodes_file:
+            print(f"[{RED}-{NC}] Error: No puedes usar 'node' y '--nodes-file' a la vez.")
+            sys.exit(1)
+        elif args.nodes_file:
+            filter_names = _load_nodes_file(args.nodes_file)
+            stop_nodes = [n for n in nodes if n.get('name') in filter_names]
+        elif args.node:
             stop_nodes = [n for n in nodes if n.get('name') == args.node]
         stop_virtualbox_vms(stop_nodes, host_api_url, args.mode)
 
@@ -201,11 +236,6 @@ def main():
         print(f"[*] Iniciando aprovisionamiento directo de Ansible para: {', '.join(target_names)}")
         target_nodes = [n for n in nodes if n.get('name') in target_names]
         provision_all_nodes(target_nodes)
-
-    elif args.action == 'listen-callbacks':
-        port = args.port if args.port else settings.get('orchestrator', {}).get('port', 8081)
-        batch_size = settings.get('orchestrator', {}).get('batch_size', 3)
-        run_callback_server(nodes, host_api_url, port=port, batch_size=batch_size)
 
 if __name__ == '__main__':
     main()

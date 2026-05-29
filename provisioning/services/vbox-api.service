@@ -10,7 +10,7 @@ Type=simple
 # La ruta al script se actualiza automáticamente al instalar con el script vbox-api-helper.sh.
 WorkingDirectory=REPO_PATH
 Environment="PYTHONPATH=REPO_PATH"
-ExecStart=/usr/bin/python3 REPO_PATH/provisioning/vbox_api_server.py
+ExecStart=/usr/bin/python3 REPO_PATH/provisioning/host/vbox_api_server.py
 
 Restart=on-failure
 RestartSec=5s

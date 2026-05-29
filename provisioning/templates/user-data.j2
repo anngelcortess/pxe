@@ -48,11 +48,14 @@ autoinstall:
   storage:
     layout:
       name: direct
-  updates: security
+  updates: none
   late-commands:
     - "curtin in-target systemctl disable apt-daily.timer apt-daily-upgrade.timer"
     - "curtin in-target systemctl disable unattended-upgrades.service"
-    # Notificar al jumpstart que la instalación ha terminado (anti-loop PXE + lanzar Ansible)
+    - "curtin in-target apt-get purge -y snapd"
+    - "curtin in-target apt-get purge -y landscape-common apport ubuntu-advantage-tools popularity-contest update-notifier-common"
+    - "curtin in-target apt-get autoremove --purge -y"
+    - "curtin in-target apt-get clean"
     - "curl -sf http://{{ jumpstart_ip }}:{{ callback_port }}/node-ready?node={{ node.name }} || true"
   shutdown: poweroff
 

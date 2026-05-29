@@ -26,7 +26,7 @@ def get_existing_vms(host_api_url):
         return result.get("vms", [])
     return []
 
-def _make_api_request(api_url, path, payload_dict):
+def _make_api_request(api_url, path, payload_dict, timeout=10):
     """Realiza una petición POST genérica a la API de VirtualBox."""
     if not api_url:
         print(f"[-] Error: URL de la API no configurada. No se puede contactar con {path}.")
@@ -40,7 +40,7 @@ def _make_api_request(api_url, path, payload_dict):
     req.add_header('Content-Length', str(len(payload)))
     
     try:
-        with urllib.request.urlopen(req, timeout=10) as response:
+        with urllib.request.urlopen(req, timeout=timeout) as response:
             return json.loads(response.read().decode('utf-8'))
     except urllib.error.HTTPError as e:
         err_body = e.read().decode('utf-8', errors='ignore')
@@ -104,7 +104,7 @@ def undeploy_virtualbox_vms(nodes, host_api_url):
     """Hace una petición a la API del Host para eliminar todas las VMs."""
     vms_to_process = [{"name": n.get('name')} for n in nodes if n.get('name') != 'jumpstart']
     print(f"[{CYAN}*{NC}] Enviando petición de borrado masivo de {len(vms_to_process)} VMs a la API del Host...")
-    result = _make_api_request(host_api_url, "/vbox/delete-vms", {"vms": vms_to_process})
+    result = _make_api_request(host_api_url, "/vbox/delete-vms", {"vms": vms_to_process}, timeout=120)
     if result and result.get("status") == "ok":
         print(f"[{GREEN}✓{NC}] {result.get('message', 'Desinstalación completada')}")
     else:

@@ -1,0 +1,27 @@
+# ====================================================================
+# Lote de despliegue para la Demo y Defensa de la Práctica
+# ====================================================================
+# Incluye la infraestructura base, el clúster entero y solo 1 hotdesk.
+# Total: 10 VMs aprovisionadas (+ el jumpstart existente).
+#
+# Esto garantiza que cabemos holgadamente en el disco del servidor 
+# tbworkers5 y dejamos espacio libre para aprovisionar un nodo 
+# extra "en directo" si el profesor lo pide.
+
+# -- Infraestructura Core --
+load-balancer
+web-frontend-1
+web-frontend-2
+storage-node
+monitoring
+
+# -- Clúster --
+cluster-master-1
+cluster-master-2
+cluster-worker-1
+cluster-worker-2
+
+# -- Hotdesks --
+# Nos cargamos el resto de hotdesks (2 al 8) de la instalación, 
+# pero mantenemos sus YAML en el repositorio intactos.
+hotdesk-1

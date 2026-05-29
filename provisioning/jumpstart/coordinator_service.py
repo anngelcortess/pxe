@@ -4,8 +4,16 @@ import threading
 import http.server
 import urllib.parse
 
-from provisioning.orchestrator.baremetal import create_vms, apply_post_install_specs, start_virtualbox_vms
-from provisioning.orchestrator.ansible_runner import provision_all_nodes
+import os
+import sys
+
+# Añadir la raíz del repositorio al path antes de hacer imports locales
+REPO_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if REPO_DIR not in sys.path:
+    sys.path.insert(0, REPO_DIR)
+
+from provisioning.jumpstart.baremetal import create_vms, apply_post_install_specs, start_virtualbox_vms
+from provisioning.jumpstart.software_provisioner import provision_all_nodes
 
 log = logging.getLogger('coordinator')
 log.setLevel(logging.INFO)
@@ -202,3 +210,33 @@ def run_callback_server(nodes, host_api_url, port=8081, batch_size=3):
         server.serve_forever()
     except KeyboardInterrupt:
         server.server_close()
+
+if __name__ == '__main__':
+    # Redirigir logs a stdout para que systemd los capture en journalctl
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s [%(levelname)s] %(name)s — %(message)s',
+        datefmt='%H:%M:%S',
+        stream=sys.stdout
+    )
+
+    from provisioning.jumpstart.parsers import load_all_nodes, load_settings_file
+
+    nodes_dir = os.path.join(REPO_DIR, 'config', 'nodes')
+    settings_path = os.path.join(REPO_DIR, 'config', 'settings.yml')
+
+    nodes = load_all_nodes(nodes_dir)
+    if not nodes:
+        print('[-] Error: No se encontraron definiciones de nodos YAML.')
+        sys.exit(1)
+
+    settings = load_settings_file(settings_path)
+
+    host_api_ip   = settings.get('host_api', {}).get('ip', '192.168.56.1')
+    host_api_port = settings.get('host_api', {}).get('port', 7070)
+    host_api_url  = f'http://{host_api_ip}:{host_api_port}'
+
+    port       = settings.get('orchestrator', {}).get('port', 8081)
+    batch_size = settings.get('orchestrator', {}).get('batch_size', 3)
+
+    run_callback_server(nodes, host_api_url, port=port, batch_size=batch_size)

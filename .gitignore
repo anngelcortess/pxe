@@ -38,3 +38,6 @@ Thumbs.db
 
 # Configuraciones generadas dinamicamente
 .local_output/
+
+# Listas de despliegue personalizadas (solo en la raíz, para no ensuciar el repo)
+/*.txt

@@ -12,7 +12,7 @@ Group=root
 
 # Ruta al script de callback — se inyecta dinámicamente mediante Ansible
 WorkingDirectory=__REPO_DIR__
-ExecStart=/usr/bin/python3 __REPO_DIR__/provisioner.py listen-callbacks
+ExecStart=/usr/bin/python3 __REPO_DIR__/provisioning/jumpstart/coordinator_service.py
 
 # Reiniciar si el proceso muere inesperadamente
 Restart=on-failure

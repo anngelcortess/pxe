@@ -11,8 +11,8 @@
 # por ejemplo, cambiar el boot order tras instalar un SO.
 #
 # Uso directo:
-#   python3 vbox_api_server.py
-#   python3 vbox_api_server.py --port 7070 --bind 192.168.56.1
+#   python3 provisioning/host/vbox_api_server.py
+#   python3 provisioning/host/vbox_api_server.py --port 7070 --bind 192.168.56.1
 #
 #
 # Verificar desde el Jumpstart:
@@ -30,7 +30,7 @@ from urllib.parse import urlparse, parse_qs
 import threading
 import time
 
-from provisioning.orchestrator.parsers import load_settings_file
+from provisioning.jumpstart.parsers import load_settings_file
 
 # ── Configuración por defecto ──────────────────────────────────────────────────
 base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

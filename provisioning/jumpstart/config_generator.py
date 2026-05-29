@@ -1,7 +1,7 @@
 import os
 import subprocess
 import jinja2
-from provisioning.orchestrator.parsers import load_networks_file, load_settings_file
+from provisioning.jumpstart.parsers import load_networks_file, load_settings_file
 
 GREEN = '\033[92m'
 YELLOW = '\033[93m'
