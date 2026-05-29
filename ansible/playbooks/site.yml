@@ -36,7 +36,7 @@
 
 # ── Rol 4: Storage & Redundancy ───────────────────────────────
 - name: "Rol 4 — Almacenamiento compartido (GlusterFS)"
-  hosts: storage
+  hosts: storage, web_frontends
   become: yes
   roles:
     - role: storage      # pendiente — Rol 4
