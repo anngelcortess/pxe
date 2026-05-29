@@ -1,0 +1,10 @@
+---
+# ansible/roles/storage/tasks/main.yml
+
+- name: "Ejecutar configuración del Servidor GlusterFS"
+  import_tasks: server.yml
+  when: inventory_hostname in groups['storage']
+
+- name: "Ejecutar configuración de Clientes GlusterFS"
+  import_tasks: client.yml
+  when: inventory_hostname in groups['web_frontends']
